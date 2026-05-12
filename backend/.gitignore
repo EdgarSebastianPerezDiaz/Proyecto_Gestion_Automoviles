@@ -1,0 +1,76 @@
+# Environment Variables (NUNCA commitar archivos .env con secretos)
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+.env.*.local
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Serverless & AWS
+.serverless/
+.env.json
+node_modules/
+bin/
+lib/
+
+# Lambda Packaging
+package/
+.eggs/
+*.zip
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Temp Files
+tmp/
+temp/ 

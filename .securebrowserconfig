@@ -1,0 +1,17 @@
+# Clear pre-populated values from login forms for security
+# Prevents browser from auto-filling sensitive credentials
+
+# Common options
+autocomplete=\"off\"              # Disable autocomplete
+
+# Form fields
+name: off
+email: off
+password: off
+api_key: off
+secret_key: off
+token: off
+database_url: off
+db_password: off
+jwt_secret: off
+private_key: off

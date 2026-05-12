@@ -1,0 +1,238 @@
+# Serverless Framework Configuration - Health Check & Keep-Warm Lambda Integration
+
+# This file shows how to integrate the /health/deep endpoint with EventBridge
+# for automated keep-warm and monitoring capabilities.
+
+# Add these configurations to your existing serverless.yml file
+
+service: heavy-freight-platform
+
+# ============================================================================
+# Functions Configuration
+# ============================================================================
+
+functions:
+  # Main API function (existing)
+  api:
+    handler: wsgi.handler
+    timeout: 30
+    memory: 512
+    events:
+      # Health check endpoints
+      - http:
+          path: health/{proxy+}
+          method: ANY
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Correlation-ID
+      # Other API endpoints...
+    
+    # Ensure environment variables are configured
+    environment:
+      FLASK_ENV: ${self:provider.stage}
+      MONGO_URI: ${ssm:heavy-freight-${self:provider.stage}-mongo-uri}
+      JWT_SECRET_KEY: ${ssm:heavy-freight-${self:provider.stage}-jwt-key}
+
+  # Keep-Warm Lambda - Calls /health/deep every 5 minutes
+  keepWarmHealthCheck:
+    handler: scripts.keep_warm_lambda_health_check.lambda_handler
+    timeout: 15
+    memory: 128
+    description: "Keep-Warm Lambda - Calls /health/deep to ensure API is truly functional"
+    
+    events:
+      # Trigger every 5 minutes
+      - schedule:
+          rate: rate(5 minutes)
+          enabled: true
+          description: "Health check via /health/deep endpoint every 5 minutes"
+    
+    # Environment variables for the keep-warm Lambda
+    environment:
+      API_BASE_URL: !Sub
+        - "https://${ApiId}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+        - ApiId: !Ref ApiGateway
+          Stage: ${self:provider.stage}
+      ALERT_SNS_TOPIC: !Ref HealthCheckAlertTopic
+      FLASK_ENV: ${self:provider.stage}
+    
+    # IAM permissions
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - sns:Publish
+        Resource: !Ref HealthCheckAlertTopic
+      - Effect: Allow
+        Action:
+          - cloudwatch:PutMetricData
+        Resource: "*"
+    
+    # Dependencies
+    package:
+      patterns:
+        - 'scripts/keep_warm_lambda_health_check.py'
+        - 'requirements.txt'
+
+# ============================================================================
+# Resources - SNS Topic for Alerts
+# ============================================================================
+
+resources:
+  Resources:
+    # SNS Topic for health check alerts
+    HealthCheckAlertTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: "Heavy Freight API Health Check Alerts"
+        TopicName: heavy-freight-health-check-alerts-${self:provider.stage}
+        Subscription:
+          - Endpoint: "${env:ALERT_EMAIL, ops-team@heavy-freight.com}"
+            Protocol: email  # You'll need to confirm the subscription
+
+    # CloudWatch Alarm - Alert if health check fails
+    HealthCheckFailureAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: heavy-freight-health-check-failure-${self:provider.stage}
+        AlarmDescription: "Alert when /health/deep endpoint reports unhealthy status"
+        MetricName: HealthStatus
+        Namespace: HeavyFreight/HealthCheck
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 0.5  # Alert if status < 0.5 (degraded or unhealthy)
+        ComparisonOperator: LessThanThreshold
+        AlarmActions:
+          - !Ref HealthCheckAlertTopic
+        
+        # Optional: treat missing data as breaching (if health check doesn't run)
+        TreatMissingData: breaching
+
+    # CloudWatch Dashboard
+    HealthCheckDashboard:
+      Type: AWS::CloudWatch::Dashboard
+      Properties:
+        DashboardName: heavy-freight-health-${self:provider.stage}
+        DashboardBody: !Sub |
+          {
+            "widgets": [
+              {
+                "type": "metric",
+                "properties": {
+                  "metrics": [
+                    [ "HeavyFreight/HealthCheck", "HealthStatus" ],
+                    [ ".", "MongodbStatus" ],
+                    [ ".", "SecretsManagerStatus" ],
+                    [ ".", "RateLimiterStatus" ],
+                    [ ".", "HealthCheckDuration" ]
+                  ],
+                  "period": 300,
+                  "stat": "Average",
+                  "region": "${AWS::Region}",
+                  "title": "API Health Metrics"
+                }
+              }
+            ]
+          }
+
+# ============================================================================
+# Plugins
+# ============================================================================
+
+plugins:
+  - serverless-python-requirements
+  - serverless-plugin-warmup  # Optional: alternative to EventBridge for keep-warm
+
+# ============================================================================
+# Custom Configuration
+# ============================================================================
+
+custom:
+  # Python requirements configuration
+  pythonRequirements:
+    dockerizePip: true
+    layer: true
+    slim: true
+    useDownloadCache: true
+    useStaticCache: true
+    slim: true
+
+# ============================================================================
+# Provider Configuration
+# ============================================================================
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  
+  # Global environment variables
+  environment:
+    LOG_LEVEL: INFO
+    FLASK_ENV: ${self:provider.stage}
+  
+  # IAM policies for all Lambda functions
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - secretsmanager:GetSecretValue
+      Resource:
+        - "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:heavy-freight-${self:provider.stage}-*"
+    
+    - Effect: Allow
+      Action:
+        - ssm:GetParameter
+      Resource:
+        - "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/heavy-freight/${self:provider.stage}/*"
+
+# ============================================================================
+# Outputs
+# ============================================================================
+
+outputs:
+  HealthCheckEndpoint:
+    Description: "Deep health check endpoint URL"
+    Value: !Sub "https://${ApiId}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/health/deep"
+  
+  HealthCheckAlertTopic:
+    Description: "SNS Topic for health check alerts"
+    Value: !Ref HealthCheckAlertTopic
+  
+  KeepWarmLambdaFunction:
+    Description: "Keep-warm Lambda function name"
+    Value: !Ref KeepWarmHealthCheckLambdaFunction
+
+# ============================================================================
+# Monitoring & Alerting Strategy
+# ============================================================================
+
+# The keep-warm Lambda function:
+# 1. Runs every 5 minutes
+# 2. Calls GET /health/deep
+# 3. Analyzes the response:
+#    - Healthy (200): All good, continue
+#    - Degraded (207): Log for investigation (non-critical failure)
+#    - Unhealthy (503): Send alert via SNS
+#    - Timeout (504): Send alert via SNS
+# 4. Publishes metrics to CloudWatch (visible in dashboard)
+# 5. Keeps Lambda container warm (prevents cold starts)
+
+# SNS Integration:
+# - Sends alerts to email (confirm subscription first)
+# - Includes full health check response in alert
+# - Lists all failed dependencies
+# - Provides timestamps for investigation
+
+# CloudWatch Dashboard shows:
+# - Overall health status trend
+# - Individual dependency status (MongoDB, Secrets Manager, Rate Limiter)
+# - Health check latency
+# - Failure patterns over time
+
+# Alarms trigger when:
+# - Status drops below 0.5 (degraded threshold)
+# - Health check doesn't run (missing data treated as breaching)
+# - Any critical dependency fails (MongoDB, Rate Limiter, Secrets Manager)

@@ -1,0 +1,303 @@
+service: heavy-freight-platform-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.12
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'prod'}
+  
+  # Memory and timeout settings
+  memorySize: 512
+  timeout: 30
+  
+  # Logging and tracing
+  logs:
+    restApi:
+      level: INFO
+      fullRequestResponse: false
+      roleArn: !GetAtt ApiGatewayRole.Arn
+    frameworkLambda: true
+  
+  # Environment variables from SSM Parameter Store
+  environment:
+    FLASK_ENV: ${self:provider.stage}
+    JWT_SECRET_KEY: ${ssm:/heavy-freight/${self:provider.stage}/JWT_SECRET_KEY}
+    JWT_ALGORITHM: ${ssm:/heavy-freight/${self:provider.stage}/JWT_ALGORITHM~true}
+    JWT_EXPIRATION_HOURS: ${ssm:/heavy-freight/${self:provider.stage}/JWT_EXPIRATION_HOURS~true}
+    BCRYPT_ROUNDS: ${ssm:/heavy-freight/${self:provider.stage}/BCRYPT_ROUNDS~true}
+    MONGO_URI: ${ssm:/heavy-freight/${self:provider.stage}/MONGO_URI~true}
+    CORS_ORIGIN: ${ssm:/heavy-freight/${self:provider.stage}/CORS_ORIGIN~true}
+    S3_BUCKET_NAME: ${ssm:/heavy-freight/${self:provider.stage}/S3_BUCKET_NAME}
+    AWS_REGION: ${self:provider.region}
+  
+  # IAM Role with minimal permissions
+  iam:
+    role:
+      statements:
+        # CloudWatch Logs permissions
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: 'arn:aws:logs:${aws:accountId}:${self:provider.region}:log-group:/aws/lambda/heavy-freight-platform-*'
+        
+        # S3 permissions (specific bucket only)
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+          Resource: 'arn:aws:s3:::${ssm:/heavy-freight/${self:provider.stage}/S3_BUCKET_NAME}/*'
+        
+        # Secrets Manager permissions (specific secrets only)
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource:
+            - 'arn:aws:secretsmanager:${aws:accountId}:${self:provider.region}:secret:/heavy-freight/${self:provider.stage}/*'
+        
+        # SSM Parameter Store access for environment variables
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+          Resource: 'arn:aws:ssm:${aws:accountId}:${self:provider.region}:parameter/heavy-freight/${self:provider.stage}/*'
+        
+        # SNS permissions (for trip reconciliation error notifications)
+        - Effect: Allow
+          Action:
+            - sns:Publish
+          Resource: !GetAtt TripReconciliationErrorTopic.TopicArn
+
+functions:
+  # Main API Lambda function
+  api:
+    handler: wsgi.handler
+    events:
+      - http:
+          path: /
+          method: ANY
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+    layers:
+      - !Ref PythonRequirementsLambdaLayer
+    timeout: 30
+    memorySize: 512
+    ephemeralStorage: 512
+    provisionedConcurrency: ${self:custom.provisionedConcurrency.${self:provider.stage}, 1}
+    environment:
+      API_URL: !Sub 'https://${ApiGatewayRestApi}.execute-api.${aws:region}.amazonaws.com/${self:provider.stage}'
+  
+  # Keep-warm Lambda function (prevents cold starts)
+  keepWarm:
+    handler: scripts/keep_warm_lambda.handler
+    events:
+      - schedule:
+          rate: rate(5 minutes)
+          enabled: ${self:custom.keepWarmEnabled.${self:provider.stage}, true}
+    timeout: 10
+    memorySize: 128
+    environment:
+      API_URL: !Sub 'https://${ApiGatewayRestApi}.execute-api.${aws:region}.amazonaws.com/${self:provider.stage}'
+  
+  # Trip Document Reconciler Lambda (hourly scheduled task)
+  tripDocumentReconciler:
+    handler: src/lambdas/trip_document_reconciler.handler
+    events:
+      - schedule:
+          rate: cron(0 * * * ? *)  # Every hour at the top of the hour
+          enabled: true
+    timeout: 300  # 5 minutes
+    memorySize: 512
+    ephemeralStorage: 512
+    layers:
+      - !Ref PythonRequirementsLambdaLayer
+    environment:
+      TRIP_RECONCILIATION_ERROR_TOPIC_ARN: !GetAtt TripReconciliationErrorTopic.TopicArn
+    # Uses provider-level IAM role with additional SNS permissions added below
+
+layers:
+  pythonRequirements:
+    path: layers/python-requirements
+    name: ${self:service}-${self:provider.stage}-python-requirements
+    description: Python dependencies for Heavy Freight Platform
+    compatibleRuntimes:
+      - python3.12
+    retain: false
+
+plugins:
+  - serverless-wsgi
+  - serverless-python-requirements
+
+custom:
+  wsgi:
+    app: wsgi.app
+    packRequirements: false
+  
+  pythonRequirements:
+    dockerizePip: false
+    layer: true
+    usePip: true
+    slim: true
+    strip: false
+    # Include only necessary files
+    useStaticCache: true
+    useDownloadCache: true
+    cacheLocation: '.serverless/.cache'
+  
+  # Keep warm configuration by stage
+  keepWarmEnabled:
+    dev: false
+    staging: true
+    prod: true
+  
+  provisionedConcurrency:
+    dev: 0
+    staging: 1
+    prod: 2
+  
+  # Alerts configuration
+  alerts:
+    alarms:
+      - functionErrors
+      - functionDuration
+      - functionThrottles
+
+resources:
+  Resources:
+    # S3 Bucket for PDF documents
+    DocumentBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: !Sub 'heavy-freight-${self:provider.stage}-documents-${aws:accountId}'
+        VersioningConfiguration:
+          Status: Enabled
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteOldVersions
+              Status: Enabled
+              NoncurrentVersionExpirationInDays: 30
+            - Id: DeleteOldDocuments
+              Status: Enabled
+              ExpirationInDays: 365
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+        Tags:
+          - Key: Service
+            Value: heavy-freight-platform
+          - Key: Stage
+            Value: ${self:provider.stage}
+    
+    # CloudWatch Alarms
+    LambdaErrorRateAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: !Sub 'heavy-freight-${self:provider.stage}-error-rate'
+        AlarmDescription: Alert when Lambda error rate exceeds 1%
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 2
+        Threshold: 1
+        ComparisonOperator: GreaterThanThreshold
+        Dimensions:
+          - Name: FunctionName
+            Value: !Ref ApiLambdaFunction
+        AlarmActions:
+          - !Ref AlertSNSTopic
+    
+    LambdaLatencyAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: !Sub 'heavy-freight-${self:provider.stage}-p99-latency'
+        AlarmDescription: Alert when Lambda p99 latency exceeds 2 seconds
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Statistic: p99
+        Period: 300
+        EvaluationPeriods: 2
+        Threshold: 2000
+        ComparisonOperator: GreaterThanThreshold
+        Dimensions:
+          - Name: FunctionName
+            Value: !Ref ApiLambdaFunction
+        AlarmActions:
+          - !Ref AlertSNSTopic
+    
+    # SNS Topic for alerts
+    AlertSNSTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: !Sub 'heavy-freight-${self:provider.stage}-alerts'
+        DisplayName: Heavy Freight Platform Alerts
+        Tags:
+          - Key: Service
+            Value: heavy-freight-platform
+          - Key: Stage
+            Value: ${self:provider.stage}
+    
+    # SNS Topic for trip reconciliation errors
+    TripReconciliationErrorTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: !Sub 'heavy-freight-${self:provider.stage}-trip-reconciliation-errors'
+        DisplayName: Trip Reconciliation Errors
+        Tags:
+          - Key: Service
+            Value: heavy-freight-platform
+          - Key: Component
+            Value: trip-document-reconciler
+          - Key: Stage
+            Value: ${self:provider.stage}
+    
+    # API Gateway Role for CloudWatch
+    ApiGatewayRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: apigateway.amazonaws.com
+              Action: 'sts:AssumeRole'
+        ManagedPolicyArns:
+          - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
+
+  Outputs:
+    DocumentBucketName:
+      Description: S3 bucket name for PDF documents
+      Value: !Ref DocumentBucket
+      Export:
+        Name: !Sub '${self:service}-${self:provider.stage}-bucket'
+    
+    ApiEndpoint:
+      Description: API Gateway endpoint URL
+      Value: !Sub 'https://${ApiGatewayRestApi}.execute-api.${aws:region}.amazonaws.com/${self:provider.stage}'
+      Export:
+        Name: !Sub '${self:service}-${self:provider.stage}-endpoint'
+    
+    AlertTopicArn:
+      Description: SNS Topic ARN for alerts
+      Value: !Ref AlertSNSTopic
+      Export:
+        Name: !Sub '${self:service}-${self:provider.stage}-alerts-topic'
+    
+    TripReconciliationErrorTopicArn:
+      Description: SNS Topic ARN for trip reconciliation errors
+      Value: !GetAtt TripReconciliationErrorTopic.TopicArn
+      Export:
+        Name: !Sub '${self:service}-${self:provider.stage}-trip-reconciliation-errors-topic'
