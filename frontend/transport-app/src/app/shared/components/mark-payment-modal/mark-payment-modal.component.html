@@ -1,0 +1,16 @@
+<app-modal [isOpen]="isOpen" title="Marcar Cumplido como Pagado" (close)="closeModal()">
+  <div class="space-y-4">
+    <p class="text-gray-700">¿Marcar este cumplido como pagado? Esta acción no se puede deshacer.</p>
+
+    <div *ngIf="fulfillment" class="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 space-y-1">
+      <div><strong>Número:</strong> {{ fulfillment.numero }}</div>
+      <div><strong>Viaje:</strong> {{ fulfillment.tripNombre }}</div>
+      <div><strong>Estado actual:</strong> {{ fulfillment.estadoPago }}</div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
+      <button type="button" (click)="confirm()" class="btn btn-primary">Confirmar</button>
+    </div>
+  </div>
+</app-modal>

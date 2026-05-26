@@ -1,0 +1,123 @@
+<div class="min-h-screen bg-gray-100">
+  <!-- Navbar -->
+  <app-navbar></app-navbar>
+
+  <div class="flex">
+    <!-- Sidebar -->
+    <app-sidebar></app-sidebar>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6">
+      <!-- Header -->
+      <div class="mb-8">
+        <h1 class="text-4xl font-bold text-darkBlue">Dashboard — Administrador</h1>
+        <p class="text-gray-600 mt-2">{{ getCurrentDate() }} | Última actualización: hace 5 minutos</p>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="isLoading" class="flex justify-center items-center py-12">
+        <div class="animate-spin">
+          <div class="h-12 w-12 border-4 border-gold border-t-transparent rounded-full"></div>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="errorMessage && !isLoading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <p class="text-red-800">{{ errorMessage }}</p>
+      </div>
+
+      <!-- Content -->
+      <div *ngIf="!isLoading && dashboardData" class="space-y-8">
+        <!-- KPI Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <app-kpi-card 
+            *ngFor="let kpi of kpis"
+            [label]="kpi.label"
+            [value]="kpi.value"
+            [unit]="kpi.unit"
+            [icon]="kpi.icon"
+            [color]="kpi.color">
+          </app-kpi-card>
+        </div>
+
+        <!-- Charts Section (Placeholder) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Chart 1 -->
+          <div class="card-brutal p-6">
+            <h2 class="text-lg font-semibold text-darkBlue mb-4">Viajes por Estado</h2>
+            <div class="rounded-lg border border-dashed border-gray-300 bg-gray-100 p-8 text-center text-gray-400">
+              📊 Gráfico de viajes por estado – próximamente
+            </div>
+          </div>
+
+          <!-- Chart 2 -->
+          <div class="card-brutal p-6">
+            <h2 class="text-lg font-semibold text-darkBlue mb-4">Ingresos Últimos 30 Días</h2>
+            <div class="rounded-lg border border-dashed border-gray-300 bg-gray-100 p-8 text-center text-gray-400">
+              📊 Gráfico de ingresos – próximamente
+            </div>
+          </div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div class="card-brutal p-6">
+          <h2 class="text-lg font-semibold text-darkBlue mb-4">Alertas Recientes</h2>
+          <div class="space-y-3">
+            <div *ngIf="alerts.length === 0" class="text-center py-8">
+              <p class="text-gray-600">No hay alertas en este momento</p>
+            </div>
+
+            <app-alert-item 
+              *ngFor="let alert of alerts"
+              [severity]="alert.severity"
+              [message]="alert.message"
+              [link]="alert.link"
+              [timestamp]="alert.timestamp"
+              (clicked)="handleAlertClick(alert.link)">
+            </app-alert-item>
+          </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+          <h2 class="text-lg font-semibold text-darkBlue mb-4">Enlaces Rápidos</h2>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <a routerLink="/admin/drivers" class="bg-white p-4 rounded-lg text-center hover:shadow-brutal transition-shadow cursor-pointer border border-gray-100">
+              <div class="text-3xl mb-2">👨‍✈️</div>
+              <p class="text-sm font-medium text-gray-900">Conductores</p>
+            </a>
+            <a routerLink="/admin/vehicles" class="bg-white p-4 rounded-lg text-center hover:shadow-brutal transition-shadow cursor-pointer border border-gray-100">
+              <div class="text-3xl mb-2">🚙</div>
+              <p class="text-sm font-medium text-gray-900">Vehículos</p>
+            </a>
+            <a routerLink="/admin/trips" class="bg-white p-4 rounded-lg text-center hover:shadow-brutal transition-shadow cursor-pointer border border-gray-100">
+              <div class="text-3xl mb-2">🚚</div>
+              <p class="text-sm font-medium text-gray-900">Viajes</p>
+            </a>
+            <a routerLink="/admin/invoices" class="bg-white p-4 rounded-lg text-center hover:shadow-brutal transition-shadow cursor-pointer border border-gray-100">
+              <div class="text-3xl mb-2">📋</div>
+              <p class="text-sm font-medium text-gray-900">Cumplidos</p>
+            </a>
+          </div>
+        </div>
+
+        <!-- Modal Testing Button -->
+        <div class="text-center">
+          <button 
+            (click)="openModal()"
+            class="btn-gold py-3 px-6">
+            Abrir Modal de Prueba
+          </button>
+        </div>
+
+        <!-- Modal Test -->
+        <app-modal [isOpen]="modalOpen" title="Modal de Prueba" (close)="closeModal()">
+          <p class="text-gray-700 mb-4">Este es un modal de prueba para validar el componente.</p>
+          <button class="btn-gold py-2 px-4" (click)="closeModal()">
+            Cerrar
+          </button>
+        </app-modal>
+      </div>
+    </main>
+  </div>
+</div>

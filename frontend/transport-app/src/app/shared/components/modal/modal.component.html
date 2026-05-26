@@ -1,0 +1,20 @@
+<div *ngIf="isOpen" 
+     (click)="onBackdropClick($event)"
+     class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4 animate-fade-in">
+  <div class="modal-shell max-w-md">
+    <div class="modal-header">
+      <h2 class="text-lg font-bold">{{ title }}</h2>
+      <button
+        (click)="onClose()"
+        class="text-2xl font-bold leading-none text-white transition hover:text-gray-100"
+        aria-label="Cerrar modal"
+      >
+        ✕
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <ng-content></ng-content>
+    </div>
+  </div>
+</div>

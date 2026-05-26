@@ -1,0 +1,17 @@
+﻿
+=== Generating Service ===
+ng generate service core/auth/auth --skip-tests
+
+
+=== Generating Interceptors ===
+ng generate interceptor core/auth/auth --skip-tests
+ng generate interceptor core/auth/error --skip-tests
+
+
+=== Generating Guards ===
+ng generate guard core/auth/auth --functional --implements=CanActivate
+ng generate guard core/auth/role --functional --implements=CanActivate
+
+
+=== Generating Login Component ===
+ng generate component features/auth/login --skip-tests --inline-style --inline-template --flat

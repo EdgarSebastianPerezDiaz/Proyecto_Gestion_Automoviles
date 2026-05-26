@@ -1,0 +1,35 @@
+<app-modal [isOpen]="isOpen" title="Documentos del Viaje" (close)="closeModal()">
+  <div *ngIf="loading" class="py-6 text-center text-gray-500">Cargando documentos...</div>
+
+  <div *ngIf="!loading && trip" class="space-y-4">
+    <p class="text-gray-700"><strong>Viaje:</strong> {{ trip.id }}</p>
+
+    <div class="space-y-2">
+      <div>
+        <p class="font-semibold text-darkBlue">Orden de Cargue</p>
+        <a *ngIf="trip.documentos.ordenCargueUrl; else pendingOrden" [href]="trip.documentos.ordenCargueUrl" target="_blank" class="text-blue-600 underline">{{ trip.documentos.ordenCargueUrl }}</a>
+        <ng-template #pendingOrden><span class="text-gray-500">Pendiente</span></ng-template>
+      </div>
+
+      <div>
+        <p class="font-semibold text-darkBlue">Manifiesto</p>
+        <a *ngIf="trip.documentos.manifiestoUrl; else pendingManifiesto" [href]="trip.documentos.manifiestoUrl" target="_blank" class="text-blue-600 underline">{{ trip.documentos.manifiestoUrl }}</a>
+        <ng-template #pendingManifiesto><span class="text-gray-500">Pendiente</span></ng-template>
+      </div>
+
+      <div>
+        <p class="font-semibold text-darkBlue">Cumplido</p>
+        <a *ngIf="trip.documentos.cumplidoUrl; else pendingCumplido" [href]="trip.documentos.cumplidoUrl" target="_blank" class="text-blue-600 underline">{{ trip.documentos.cumplidoUrl }}</a>
+        <ng-template #pendingCumplido><span class="text-gray-500">Pendiente</span></ng-template>
+      </div>
+    </div>
+
+    <button *ngIf="hasMissingDocuments()" (click)="reconcile()" [disabled]="reconciling" class="btn btn-primary">
+      {{ reconciling ? 'Reconciliando...' : 'Reconciliar documentos' }}
+    </button>
+  </div>
+
+  <div *ngIf="!loading && !trip" class="py-6 text-center text-gray-500">
+    No se encontró información del viaje.
+  </div>
+</app-modal>

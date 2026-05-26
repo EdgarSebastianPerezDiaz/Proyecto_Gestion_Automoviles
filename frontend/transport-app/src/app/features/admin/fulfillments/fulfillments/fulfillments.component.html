@@ -1,0 +1,114 @@
+<div class="flex flex-col min-h-screen bg-gray-50">
+  <app-navbar></app-navbar>
+
+  <div class="flex flex-1">
+    <app-sidebar></app-sidebar>
+
+    <main class="flex-1 p-8">
+      <div class="max-w-7xl mx-auto">
+        <div class="mb-8">
+          <h1 class="text-4xl font-bold text-darkBlue mb-2">Cumplidos</h1>
+          <p class="text-gray-600">Gestión de documentos de recepción de carga</p>
+        </div>
+
+        <div class="flex gap-4 mb-6 items-center flex-wrap">
+          <div class="flex-1 min-w-[260px] relative">
+            <span class="absolute left-3 top-3 text-gray-400 text-xl">🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar por número de cumplido o viaje..."
+              (input)="onSearch($event)"
+              class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gold transition"
+            />
+          </div>
+
+          <button
+            (click)="openCreateModal()"
+            class="btn-gold px-6 py-2 rounded-lg font-bold text-white hover:bg-gold-dark transition"
+          >
+            + Registrar Cumplido
+          </button>
+        </div>
+
+        <div class="mb-6 flex flex-wrap gap-3">
+          <button (click)="onFilterChange('todos')" [ngClass]="estadoPagoFilter === 'todos' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'" class="px-5 py-2 rounded-full font-semibold transition">Todos</button>
+          <button (click)="onFilterChange('Pendiente')" [ngClass]="estadoPagoFilter === 'Pendiente' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'" class="px-5 py-2 rounded-full font-semibold transition">Pendiente</button>
+          <button (click)="onFilterChange('Pagado')" [ngClass]="estadoPagoFilter === 'Pagado' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'" class="px-5 py-2 rounded-full font-semibold transition">Pagado</button>
+        </div>
+
+        <div class="table-shell">
+          <div *ngIf="isLoading" class="p-8 text-center text-gray-500">Cargando cumplidos...</div>
+
+          <table *ngIf="!isLoading && fulfillments.length > 0" class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">N° Cumplido</th>
+                <th class="px-4 py-3 text-left">Viaje Asociado</th>
+                <th class="px-4 py-3 text-left">Fecha Entrega</th>
+                <th class="px-4 py-3 text-left">Recibido por</th>
+                <th class="px-4 py-3 text-left">Estado Pago</th>
+                <th class="px-4 py-3 text-left">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let fulfillment of fulfillments" class="border-b border-gray-200 hover:bg-gray-50 transition">
+                <td class="px-4 py-3 font-semibold text-darkBlue">{{ fulfillment.numero }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ fulfillment.tripNombre }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ fulfillment.fechaEntrega | date:'dd/MM/yyyy' }} {{ fulfillment.horaEntrega }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ fulfillment.recibidoPor }}</td>
+                <td class="px-4 py-3">
+                  <span [ngClass]="getStatusClass(fulfillment.estadoPago)">
+                    {{ fulfillment.estadoPago }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap gap-2">
+                    <button (click)="openDetailsModal(fulfillment)" class="btn-outline px-3 py-2 text-sm">Ver Detalles</button>
+                    <button *ngIf="isAdmin && fulfillment.estadoPago === 'Pendiente'" (click)="openPaymentModal(fulfillment)" class="btn-gold px-3 py-2 text-sm">Marcar Pagado</button>
+                    <button *ngIf="isAdmin" (click)="deleteFulfillment(fulfillment)" class="btn-outline px-3 py-2 text-sm text-red-700 border-red-200 hover:bg-red-50">Eliminar</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div *ngIf="!isLoading && fulfillments.length === 0" class="p-8 text-center text-gray-500">
+            No se encontraron cumplidos.
+          </div>
+        </div>
+
+        <div *ngIf="!isLoading && total > 0" class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="text-sm text-gray-600">
+            Mostrando {{ getStartIndex() }} - {{ getEndIndex() }} de {{ total }} cumplidos
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button (click)="previousPage()" [disabled]="currentPage === 1" class="btn-outline px-4 py-2">← Anterior</button>
+            <div class="px-3 py-2 text-darkBlue font-semibold">Página {{ currentPage }} de {{ getTotalPages() }}</div>
+            <button (click)="nextPage()" [disabled]="currentPage >= getTotalPages()" class="btn-outline px-4 py-2">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<app-fulfillment-form-modal
+  [isOpen]="isFormModalOpen"
+  [tripId]="selectedTripId"
+  (saved)="onFulfillmentSaved()"
+  (close)="closeFormModal()"
+></app-fulfillment-form-modal>
+
+<app-fulfillment-details-modal
+  [isOpen]="isDetailsModalOpen"
+  [fulfillment]="selectedFulfillment"
+  (close)="closeDetailsModal()"
+></app-fulfillment-details-modal>
+
+<app-mark-payment-modal
+  [isOpen]="isPaymentModalOpen"
+  [fulfillment]="selectedFulfillment"
+  (saved)="onFulfillmentSaved()"
+  (close)="closePaymentModal()"
+></app-mark-payment-modal>

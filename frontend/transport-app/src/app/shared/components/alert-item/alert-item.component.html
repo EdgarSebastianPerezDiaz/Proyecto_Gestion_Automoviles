@@ -1,0 +1,15 @@
+<div 
+  (click)="handleClick()"
+  [ngClass]="getBackgroundColor()"
+  class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+  <div class="flex-shrink-0 mr-3 text-lg">
+    {{ getIcon() }}
+  </div>
+  <div class="flex-1">
+    <p class="font-medium">{{ message }}</p>
+    <p *ngIf="timestamp" class="text-xs opacity-75 mt-1">{{ formatTime() }}</p>
+  </div>
+  <div class="flex-shrink-0">
+    <span class="text-lg">→</span>
+  </div>
+</div>

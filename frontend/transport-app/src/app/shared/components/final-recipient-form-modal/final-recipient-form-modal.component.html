@@ -1,0 +1,42 @@
+<app-modal [isOpen]="isOpen" [title]="mode === 'create' ? 'Agregar EDestino' : 'Editar EDestino'" (close)="closeModal()">
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="form-group">
+        <label class="form-label">Nombre *</label>
+        <input type="text" formControlName="nombre" class="form-input" placeholder="Ej. Metro de Bogotá S.A.S." [class.border-red-500]="isFieldInvalid('nombre')" />
+        <span *ngIf="isFieldInvalid('nombre')" class="form-error">{{ getFieldError('nombre') }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">NIT *</label>
+        <input type="text" formControlName="nit" class="form-input" placeholder="Ej. 900.123.456-7" [class.border-red-500]="isFieldInvalid('nit')" />
+        <span *ngIf="isFieldInvalid('nit')" class="form-error">{{ getFieldError('nit') }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Dirección *</label>
+        <input type="text" formControlName="direccion" class="form-input" placeholder="Ej. Calle 26 # 59-51, Bogotá" [class.border-red-500]="isFieldInvalid('direccion')" />
+        <span *ngIf="isFieldInvalid('direccion')" class="form-error">{{ getFieldError('direccion') }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Teléfono *</label>
+        <input type="text" formControlName="telefono" class="form-input" placeholder="Ej. (601) 123 4567" [class.border-red-500]="isFieldInvalid('telefono')" />
+        <span *ngIf="isFieldInvalid('telefono')" class="form-error">{{ getFieldError('telefono') }}</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Correo *</label>
+      <input type="email" formControlName="correo" class="form-input" placeholder="Ej. compras@metrobogota.gov.co" [class.border-red-500]="isFieldInvalid('correo')" />
+      <span *ngIf="isFieldInvalid('correo')" class="form-error">{{ getFieldError('correo') }}</span>
+    </div>
+
+    <p class="text-sm text-gray-600">* Campos obligatorios</p>
+
+    <div class="modal-footer">
+      <button type="button" (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
+      <button type="submit" [disabled]="!form.valid" [class.opacity-50]="!form.valid" [class.cursor-not-allowed]="!form.valid" class="btn btn-primary">Guardar</button>
+    </div>
+  </form>
+</app-modal>
