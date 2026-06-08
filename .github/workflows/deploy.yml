@@ -16,6 +16,7 @@ env:
   AWS_REGION: us-east-1
   NODE_VERSION: '20'
   PYTHON_VERSION: '3.11'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 1 — Backend tests
@@ -24,6 +25,17 @@ jobs:
   test-backend:
     name: Backend Tests
     runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
