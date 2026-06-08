@@ -1,0 +1,22 @@
+<app-modal [isOpen]="isOpen" title="Cambiar Estado del Viaje" (close)="closeModal()">
+  <div class="space-y-4">
+    <p class="text-gray-700">Estado actual: <strong>{{ currentStatus }}</strong></p>
+
+    <div *ngIf="getAllowedStatuses().length > 0" class="form-group">
+      <label class="form-label">Nuevo Estado</label>
+      <select [(ngModel)]="selectedStatus" class="form-input">
+        <option value="" disabled>Selecciona un estado</option>
+        <option *ngFor="let status of getAllowedStatuses()" [value]="status">{{ status }}</option>
+      </select>
+    </div>
+
+    <div *ngIf="getAllowedStatuses().length === 0" class="text-sm text-gray-600">
+      No hay transiciones disponibles para este estado.
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
+      <button type="button" (click)="confirm()" [disabled]="!selectedStatus" class="btn btn-primary">Confirmar</button>
+    </div>
+  </div>
+</app-modal>

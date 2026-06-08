@@ -1,0 +1,51 @@
+<app-modal [isOpen]="isOpen" [title]="mode === 'create' ? 'Agregar ETransportista' : 'Editar ETransportista'" (close)="closeModal()">
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="form-group">
+        <label class="form-label">Nombre *</label>
+        <input type="text" formControlName="nombre" class="form-input" placeholder="Ej. Avance MC S.A.S." [class.border-red-500]="isFieldInvalid('nombre')" />
+        <span *ngIf="isFieldInvalid('nombre')" class="form-error">{{ getFieldError('nombre') }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">NIT / Cédula *</label>
+        <input type="text" formControlName="nit" class="form-input" placeholder="Ej. 98.765.432-1" [class.border-red-500]="isFieldInvalid('nit')" />
+        <span *ngIf="isFieldInvalid('nit')" class="form-error">{{ getFieldError('nit') }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Dirección *</label>
+        <input type="text" formControlName="direccion" class="form-input" placeholder="Ej. Cra 20 #15-30, Duitama" [class.border-red-500]="isFieldInvalid('direccion')" />
+        <span *ngIf="isFieldInvalid('direccion')" class="form-error">{{ getFieldError('direccion') }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Teléfono *</label>
+        <input type="text" formControlName="telefono" class="form-input" placeholder="Ej. 315 555 0004" [class.border-red-500]="isFieldInvalid('telefono')" />
+        <span *ngIf="isFieldInvalid('telefono')" class="form-error">{{ getFieldError('telefono') }}</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Correo *</label>
+      <input type="email" formControlName="correo" class="form-input" placeholder="Ej. contacto@avancemc.com" [class.border-red-500]="isFieldInvalid('correo')" />
+      <span *ngIf="isFieldInvalid('correo')" class="form-error">{{ getFieldError('correo') }}</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Tipo de Documento (opcional)</label>
+      <select formControlName="tipoDocumento" class="form-input">
+        <option value="">Selecciona una opción</option>
+        <option value="NIT">NIT</option>
+        <option value="Cédula">Cédula</option>
+      </select>
+    </div>
+
+    <p class="text-sm text-gray-600">* Campos obligatorios</p>
+
+    <div class="modal-footer">
+      <button type="button" (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
+      <button type="submit" [disabled]="!form.valid" [class.opacity-50]="!form.valid" [class.cursor-not-allowed]="!form.valid" class="btn btn-primary">Guardar</button>
+    </div>
+  </form>
+</app-modal>

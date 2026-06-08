@@ -1,0 +1,111 @@
+<app-modal [isOpen]="isOpen" [title]="mode === 'create' ? 'Nuevo Viaje' : 'Editar Viaje'" (close)="closeModal()">
+  <div *ngIf="loadingOptions" class="py-6 text-center text-gray-500">Cargando datos...</div>
+
+  <form *ngIf="!loadingOptions" [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+    <div class="flex gap-2 mb-4">
+      <button type="button" class="px-3 py-2 rounded-full text-sm font-semibold" [ngClass]="currentStep === 1 ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'">1. Ruta</button>
+      <button type="button" class="px-3 py-2 rounded-full text-sm font-semibold" [ngClass]="currentStep === 2 ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'">2. Recursos</button>
+      <button type="button" class="px-3 py-2 rounded-full text-sm font-semibold" [ngClass]="currentStep === 3 ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'">3. Carga</button>
+    </div>
+
+    <div *ngIf="currentStep === 1" class="space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="form-group">
+          <label class="form-label">Origen *</label>
+          <select formControlName="origenId" class="form-input" [class.border-red-500]="isFieldInvalid('origenId')">
+            <option value="">Selecciona un origen</option>
+            <option *ngFor="let company of companies" [value]="company.id">{{ company.nombre }}</option>
+          </select>
+          <span *ngIf="isFieldInvalid('origenId')" class="form-error">{{ getFieldError('origenId') }}</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Destino *</label>
+          <select formControlName="destinoId" class="form-input" [class.border-red-500]="isFieldInvalid('destinoId')">
+            <option value="">Selecciona un destino</option>
+            <option *ngFor="let recipient of finalRecipients" [value]="recipient.id">{{ recipient.nombre }}</option>
+          </select>
+          <span *ngIf="isFieldInvalid('destinoId')" class="form-error">{{ getFieldError('destinoId') }}</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fecha de Salida *</label>
+          <input type="date" formControlName="fechaSalida" [min]="dateMin" class="form-input" [class.border-red-500]="isFieldInvalid('fechaSalida')" />
+          <span *ngIf="isFieldInvalid('fechaSalida')" class="form-error">{{ getFieldError('fechaSalida') }}</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fecha Llegada Estimada *</label>
+          <input type="date" formControlName="fechaLlegadaEstimada" [min]="form.get('fechaSalida')?.value || dateMin" class="form-input" [class.border-red-500]="isFieldInvalid('fechaLlegadaEstimada')" />
+          <span *ngIf="isFieldInvalid('fechaLlegadaEstimada')" class="form-error">{{ getFieldError('fechaLlegadaEstimada') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="currentStep === 2" class="space-y-4">
+      <div class="form-group">
+        <label class="form-label">Transportista *</label>
+        <select formControlName="transportistaId" class="form-input" [class.border-red-500]="isFieldInvalid('transportistaId')">
+          <option value="">Selecciona un transportista</option>
+          <option *ngFor="let transportista of transportistas" [value]="transportista.id">{{ transportista.nombre }}</option>
+        </select>
+        <span *ngIf="isFieldInvalid('transportistaId')" class="form-error">{{ getFieldError('transportistaId') }}</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="form-group">
+          <label class="form-label">Vehículo *</label>
+          <select formControlName="vehiculoId" class="form-input" [class.border-red-500]="isFieldInvalid('vehiculoId')">
+            <option value="">Selecciona un vehículo</option>
+            <option *ngFor="let vehicle of filteredVehicles" [value]="vehicle.id">{{ vehicle.placa }} - {{ vehicle.marca }} {{ vehicle.modelo }}</option>
+          </select>
+          <span *ngIf="isFieldInvalid('vehiculoId')" class="form-error">{{ getFieldError('vehiculoId') }}</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Conductor *</label>
+          <select formControlName="conductorId" class="form-input" [class.border-red-500]="isFieldInvalid('conductorId')">
+            <option value="">Selecciona un conductor</option>
+            <option *ngFor="let driver of filteredDrivers" [value]="driver.id">{{ driver.fullName }}</option>
+          </select>
+          <span *ngIf="isFieldInvalid('conductorId')" class="form-error">{{ getFieldError('conductorId') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="currentStep === 3" class="space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="form-group">
+          <label class="form-label">Tipo de Carga *</label>
+          <select formControlName="cargoTypeId" class="form-input" [class.border-red-500]="isFieldInvalid('cargoTypeId')">
+            <option value="">Selecciona un tipo de carga</option>
+            <option *ngFor="let cargoType of cargoTypes" [value]="cargoType.id">{{ cargoType.nombre }}</option>
+          </select>
+          <span *ngIf="isFieldInvalid('cargoTypeId')" class="form-error">{{ getFieldError('cargoTypeId') }}</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Peso (Ton) *</label>
+          <input type="number" formControlName="peso" class="form-input" min="0.1" step="0.1" placeholder="Ej. 28.5" [class.border-red-500]="isFieldInvalid('peso')" />
+          <span *ngIf="isFieldInvalid('peso')" class="form-error">{{ getFieldError('peso') }}</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Costo Total</label>
+        <input type="text" class="form-input bg-gray-100" [value]="costoTotal | currency:'COP':'symbol':'1.0-0'" readonly />
+      </div>
+
+      <p class="text-sm text-gray-600">Capacidad del vehículo: {{ getSelectedVehicleCapacity() | number:'1.2-2' }} Ton</p>
+    </div>
+
+    <p class="text-sm text-gray-600">* Campos obligatorios</p>
+
+    <div class="modal-footer">
+      <button type="button" (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
+      <button type="button" *ngIf="currentStep > 1" (click)="previousStep()" class="btn btn-secondary">← Atrás</button>
+      <button type="button" *ngIf="currentStep < 3" (click)="nextStep()" class="btn btn-primary">Siguiente →</button>
+      <button type="submit" *ngIf="currentStep === 3" [disabled]="isSaveDisabled()" [class.opacity-50]="isSaveDisabled()" [class.cursor-not-allowed]="isSaveDisabled()" class="btn btn-primary">Guardar</button>
+    </div>
+  </form>
+</app-modal>

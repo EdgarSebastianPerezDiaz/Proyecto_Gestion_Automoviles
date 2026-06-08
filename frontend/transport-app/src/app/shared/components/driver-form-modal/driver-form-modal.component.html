@@ -1,0 +1,141 @@
+<app-modal [isOpen]="isOpen" (close)="closeModal()">
+  <ng-container *ngIf="isOpen">
+    <div class="modal-header">
+      <h2 class="text-2xl font-bold text-dark-navy">
+        {{ mode === 'create' ? 'Agregar Conductor' : 'Editar Conductor' }}
+      </h2>
+      <button (click)="closeModal()" class="text-2xl text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="modal-body">
+      <!-- Nombre Completo -->
+      <div class="form-group">
+        <label class="form-label">Nombre Completo *</label>
+        <input
+          type="text"
+          formControlName="fullName"
+          placeholder="Ej. Jaime Galindo Pérez"
+          class="form-input"
+        />
+        <span *ngIf="form.get('fullName')?.touched" class="form-error">
+          {{ getFieldError('fullName') }}
+        </span>
+      </div>
+
+      <!-- Cédula -->
+      <div class="form-group">
+        <label class="form-label">Cédula *</label>
+        <input
+          type="text"
+          formControlName="cedula"
+          placeholder="Ej. 12.345.678"
+          class="form-input"
+        />
+        <span *ngIf="form.get('cedula')?.touched" class="form-error">
+          {{ getFieldError('cedula') }}
+        </span>
+      </div>
+
+      <!-- Teléfono -->
+      <div class="form-group">
+        <label class="form-label">Teléfono</label>
+        <input
+          type="tel"
+          formControlName="telefono"
+          placeholder="Ej. (310) 555 0001"
+          class="form-input"
+        />
+        <span *ngIf="form.get('telefono')?.touched" class="form-error">
+          {{ getFieldError('telefono') }}
+        </span>
+      </div>
+
+      <!-- Dirección -->
+      <div class="form-group">
+        <label class="form-label">Dirección</label>
+        <input
+          type="text"
+          formControlName="direccion"
+          placeholder="Ej. Cra 10 #20-50, Bogotá"
+          class="form-input"
+        />
+        <span *ngIf="form.get('direccion')?.touched" class="form-error">
+          {{ getFieldError('direccion') }}
+        </span>
+      </div>
+
+      <!-- Correo -->
+      <div class="form-group">
+        <label class="form-label">Correo Electrónico</label>
+        <input
+          type="email"
+          formControlName="correo"
+          placeholder="Ej. j.galindo@mail.com"
+          class="form-input"
+        />
+        <span *ngIf="form.get('correo')?.touched" class="form-error">
+          {{ getFieldError('correo') }}
+        </span>
+      </div>
+
+      <!-- N° Licencia -->
+      <div class="form-group">
+        <label class="form-label">N° Licencia *</label>
+        <input
+          type="text"
+          formControlName="numeroLicencia"
+          placeholder="Ej. LIC-001234"
+          class="form-input"
+        />
+        <span *ngIf="form.get('numeroLicencia')?.touched" class="form-error">
+          {{ getFieldError('numeroLicencia') }}
+        </span>
+      </div>
+
+      <!-- Categoría de Licencia -->
+      <div class="form-group">
+        <label class="form-label">Categoría de Licencia *</label>
+        <select formControlName="categoriaLicencia" class="form-input">
+          <option value="C1">C1 - Automóviles livianos</option>
+          <option value="C2">C2 - Automóviles pesados</option>
+          <option value="C3">C3 - Buses</option>
+          <option value="C4">C4 - Camiones</option>
+        </select>
+        <span *ngIf="form.get('categoriaLicencia')?.touched" class="form-error">
+          {{ getFieldError('categoriaLicencia') }}
+        </span>
+      </div>
+
+      <!-- Fecha Vencimiento Licencia -->
+      <div class="form-group">
+        <label class="form-label">Fecha Vencimiento Licencia *</label>
+        <input
+          type="date"
+          formControlName="fechaVencimientoLicencia"
+          class="form-input"
+        />
+        <span *ngIf="form.get('fechaVencimientoLicencia')?.touched" class="form-error">
+          {{ getFieldError('fechaVencimientoLicencia') }}
+        </span>
+      </div>
+
+      <p class="text-sm text-gray-600 mt-4">* Campos obligatorios</p>
+
+      <!-- Botones -->
+      <div class="modal-footer">
+        <button type="button" (click)="closeModal()" class="btn btn-secondary">
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          [disabled]="!form.valid"
+          [class.opacity-50]="!form.valid"
+          [class.cursor-not-allowed]="!form.valid"
+          class="btn btn-primary"
+        >
+          Guardar Conductor
+        </button>
+      </div>
+    </form>
+  </ng-container>
+</app-modal>

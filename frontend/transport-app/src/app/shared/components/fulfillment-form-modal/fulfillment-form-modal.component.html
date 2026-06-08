@@ -1,0 +1,44 @@
+<app-modal [isOpen]="isOpen" title="Registrar Cumplido" (close)="closeModal()">
+  <div *ngIf="loadingTrips" class="py-6 text-center text-gray-500">Cargando viajes disponibles...</div>
+
+  <form *ngIf="!loadingTrips" [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+    <div class="form-group">
+      <label class="form-label">Viaje Asociado *</label>
+      <select formControlName="tripId" class="form-input" [class.border-red-500]="isFieldInvalid('tripId')">
+        <option value="">Selecciona un viaje entregado</option>
+        <option *ngFor="let trip of availableTrips" [value]="trip.id">{{ trip.id }} - {{ trip.origenNombre || trip.origin }} → {{ trip.destinoNombre || trip.destination }}</option>
+      </select>
+      <span *ngIf="isFieldInvalid('tripId')" class="form-error">{{ getFieldError('tripId') }}</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="form-group">
+        <label class="form-label">Fecha de Entrega *</label>
+        <input type="date" formControlName="fechaEntrega" class="form-input" [class.border-red-500]="isFieldInvalid('fechaEntrega')" />
+        <span *ngIf="isFieldInvalid('fechaEntrega')" class="form-error">{{ getFieldError('fechaEntrega') }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Hora de Entrega *</label>
+        <input type="time" formControlName="horaEntrega" class="form-input" [class.border-red-500]="isFieldInvalid('horaEntrega')" />
+        <span *ngIf="isFieldInvalid('horaEntrega')" class="form-error">{{ getFieldError('horaEntrega') }}</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Recibido por *</label>
+      <input type="text" formControlName="recibidoPor" class="form-input" placeholder="Nombre de quien recibe" [class.border-red-500]="isFieldInvalid('recibidoPor')" />
+      <span *ngIf="isFieldInvalid('recibidoPor')" class="form-error">{{ getFieldError('recibidoPor') }}</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea formControlName="observaciones" class="form-input" rows="3" placeholder="Observaciones opcionales"></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Guardar</button>
+    </div>
+  </form>
+</app-modal>

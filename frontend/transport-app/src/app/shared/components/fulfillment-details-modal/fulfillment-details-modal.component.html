@@ -1,0 +1,19 @@
+<app-modal [isOpen]="isOpen" title="Detalles del Cumplido" (close)="closeModal()">
+  <div *ngIf="fulfillment; else emptyState" class="space-y-3 text-sm text-gray-700">
+    <div><strong>Número:</strong> {{ fulfillment.numero }}</div>
+    <div><strong>Viaje Asociado:</strong> {{ fulfillment.tripNombre }}</div>
+    <div><strong>Fecha de Entrega:</strong> {{ fulfillment.fechaEntrega | date:'dd/MM/yyyy' }} {{ fulfillment.horaEntrega }}</div>
+    <div><strong>Recibido por:</strong> {{ fulfillment.recibidoPor }}</div>
+    <div><strong>Observaciones:</strong> {{ fulfillment.observaciones || 'Sin observaciones' }}</div>
+    <div><strong>Estado de Pago:</strong> {{ fulfillment.estadoPago }}</div>
+    <div><strong>Creado:</strong> {{ fulfillment.createdAt | date:'dd/MM/yyyy HH:mm' }}</div>
+  </div>
+
+  <ng-template #emptyState>
+    <p class="text-gray-500">No hay información disponible.</p>
+  </ng-template>
+
+  <div class="modal-footer mt-4 flex justify-end">
+    <button type="button" (click)="closeModal()" class="btn btn-secondary">Cerrar</button>
+  </div>
+</app-modal>

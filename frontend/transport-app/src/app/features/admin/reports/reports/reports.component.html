@@ -1,0 +1,108 @@
+<div class="min-h-screen bg-gray-50">
+  <app-navbar></app-navbar>
+  <div class="flex">
+    <app-sidebar></app-sidebar>
+    <main class="flex-1 p-6">
+      <div class="card-brutal p-6">
+        <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <h2 class="text-2xl font-semibold text-darkBlue">Reportes</h2>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-outline px-3 py-2" [class.font-bold]="activeTab==='trips'" (click)="switchTab('trips')">Reporte de Viajes</button>
+            <button class="btn-outline px-3 py-2" [class.font-bold]="activeTab==='financial'" (click)="switchTab('financial')">Reporte Financiero</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-3 mb-4 items-end md:grid-cols-3">
+          <div>
+            <label class="block text-sm font-medium text-darkBlue mb-1">Desde</label>
+            <input type="date" class="form-input" [(ngModel)]="fromDate" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-darkBlue mb-1">Hasta</label>
+            <input type="date" class="form-input" [(ngModel)]="toDate" />
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-gold px-4 py-2" (click)="generateReport()">Generar Reporte</button>
+            <button class="btn-outline px-4 py-2" (click)="exportCurrentTab()">Exportar a Excel</button>
+          </div>
+        </div>
+
+        <section *ngIf="activeTab === 'trips'">
+          <div class="grid grid-cols-1 gap-3 mb-4 md:grid-cols-4">
+            <div *ngFor="let kpi of tripsKpis" class="p-4 rounded border bg-white shadow-sm">
+              <div class="text-sm text-gray-500">{{ kpi.label }}</div>
+              <div class="text-2xl font-bold">{{ kpi.value }}</div>
+            </div>
+          </div>
+
+          <div class="mb-4 rounded-lg border border-dashed border-gray-300 bg-gray-100 p-8 text-center text-gray-400">
+            📊 Gráfico de viajes por mes – próximamente
+          </div>
+
+          <div class="table-shell">
+            <table class="table-base">
+              <thead class="table-head">
+                <tr>
+                  <th class="px-4 py-3 text-left">ID Viaje</th>
+                  <th class="px-4 py-3 text-left">Origen – Destino</th>
+                  <th class="px-4 py-3 text-left">Conductor</th>
+                  <th class="px-4 py-3 text-left">Fecha Salida</th>
+                  <th class="px-4 py-3 text-left">Costo Total</th>
+                  <th class="px-4 py-3 text-left">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of tripsRows" class="border-b border-gray-200 hover:bg-gray-50 transition">
+                  <td class="px-4 py-3">{{ row.idViaje }}</td>
+                  <td class="px-4 py-3">{{ row.ruta }}</td>
+                  <td class="px-4 py-3">{{ row.conductor }}</td>
+                  <td class="px-4 py-3">{{ row.fechaSalida | date:'dd/MM/yyyy' }}</td>
+                  <td class="px-4 py-3">{{ row.costoTotal | currency:'COP':'symbol-narrow':'1.0-0' }}</td>
+                  <td class="px-4 py-3">{{ row.estado }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section *ngIf="activeTab === 'financial'">
+          <div class="grid grid-cols-1 gap-3 mb-4 md:grid-cols-4">
+            <div *ngFor="let kpi of financialKpis" class="p-4 rounded border bg-white shadow-sm">
+              <div class="text-sm text-gray-500">{{ kpi.label }}</div>
+              <div class="text-2xl font-bold">
+                {{ (kpi.label.includes('Ingresos') || kpi.label.includes('Cartera')) ? (kpi.value | currency:'COP':'symbol-narrow':'1.0-0') : kpi.value }}
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-4 rounded-lg border border-dashed border-gray-300 bg-gray-100 p-8 text-center text-gray-400">
+            📊 Gráfico de ingresos por mes – próximamente
+          </div>
+
+          <div class="table-shell">
+            <table class="table-base">
+              <thead class="table-head">
+                <tr>
+                  <th class="px-4 py-3 text-left">N° Cumplido</th>
+                  <th class="px-4 py-3 text-left">Viaje Asociado</th>
+                  <th class="px-4 py-3 text-left">Cliente</th>
+                  <th class="px-4 py-3 text-left">Fecha Entrega</th>
+                  <th class="px-4 py-3 text-left">Monto Pendiente</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of financialRows" class="border-b border-gray-200 hover:bg-gray-50 transition">
+                  <td class="px-4 py-3">{{ row.numeroCumplido }}</td>
+                  <td class="px-4 py-3">{{ row.viajeAsociado }}</td>
+                  <td class="px-4 py-3">{{ row.cliente }}</td>
+                  <td class="px-4 py-3">{{ row.fechaEntrega | date:'dd/MM/yyyy' }}</td>
+                  <td class="px-4 py-3">{{ row.montoPendiente | currency:'COP':'symbol-narrow':'1.0-0' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>

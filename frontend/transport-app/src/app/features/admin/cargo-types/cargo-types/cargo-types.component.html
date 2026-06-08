@@ -1,0 +1,113 @@
+<div class="flex flex-col min-h-screen bg-gray-50">
+  <app-navbar></app-navbar>
+
+  <div class="flex flex-1">
+    <app-sidebar></app-sidebar>
+
+    <main class="flex-1 p-8">
+      <div class="max-w-7xl mx-auto">
+        <div class="mb-8">
+          <h1 class="text-4xl font-bold text-darkBlue mb-2">Gestión de Tipos de Carga</h1>
+          <p class="text-gray-600">Administra los tipos de carga del sistema</p>
+        </div>
+
+        <div class="flex gap-4 mb-6 items-center">
+          <div class="flex-1 relative">
+            <span class="absolute left-3 top-3 text-gray-400 text-xl">🔍</span>
+            <input
+              type="text"
+              placeholder="🔍 Buscar por tipo o descripción..."
+              (input)="onSearch($event)"
+              class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gold transition"
+            />
+          </div>
+
+          <button
+            *ngIf="isAdmin"
+            (click)="openAddModal()"
+            class="btn-gold px-6 py-2 rounded-lg font-bold text-white hover:bg-gold-dark transition"
+          >
+            + Agregar Carga
+          </button>
+        </div>
+
+        <div *ngIf="isLoading" class="flex justify-center py-8">
+          <p class="text-gray-500">Cargando tipos de carga...</p>
+        </div>
+
+        <div *ngIf="!isLoading" class="table-shell">
+          <table class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">ID Carga</th>
+                <th class="px-4 py-3 text-left">Tipo de Carga</th>
+                <th class="px-4 py-3 text-left">Descripción</th>
+                <th class="px-4 py-3 text-left">Peso (Ton)</th>
+                <th class="px-4 py-3 text-left">Precio / Ton (COP)</th>
+                <th *ngIf="isAdmin" class="px-4 py-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let cargoType of cargoTypes; let last = last" [ngClass]="!last ? 'border-b border-gray-200' : ''" class="hover:bg-gray-50 transition">
+                <td class="px-4 py-3 font-medium text-darkBlue">{{ cargoType.id }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ cargoType.nombre }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ cargoType.descripcion }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ cargoType.pesoReferencia !== undefined ? (cargoType.pesoReferencia | number:'1.2-2') : '-' }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ cargoType.precioPorTon | currency:'COP':'symbol':'1.0-0' }}</td>
+                <td *ngIf="isAdmin" class="px-4 py-3 text-center">
+                  <div class="flex flex-wrap justify-center gap-2">
+                    <button (click)="openEditModal(cargoType)" class="btn-gold px-3 py-2 text-sm">✏️ Editar</button>
+                    <button (click)="deleteCargoType(cargoType.id)" class="btn-outline px-3 py-2 text-sm text-red-700 border-red-200 hover:bg-red-50">🗑️ Eliminar</button>
+                  </div>
+                </td>
+              </tr>
+
+              <tr *ngIf="cargoTypes.length === 0">
+                <td [attr.colspan]="isAdmin ? 6 : 5" class="px-6 py-8 text-center text-gray-500">
+                  No hay tipos de carga registrados
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div *ngIf="!isLoading && total > 0" class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between text-sm text-gray-600">
+          <div>
+            Mostrando {{ getStartIndex() }} - {{ getEndIndex() }} de {{ total }} tipos de carga
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button
+              (click)="previousPage()"
+              [disabled]="currentPage === 1"
+              class="btn-outline px-4 py-2"
+            >
+              ← Anterior
+            </button>
+
+            <div class="px-4 py-2 text-darkBlue font-bold">
+              Página {{ currentPage }} de {{ getTotalPages() }}
+            </div>
+
+            <button
+              (click)="nextPage()"
+              [disabled]="currentPage >= getTotalPages()"
+              class="btn-outline px-4 py-2"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<app-cargo-type-form-modal
+  *ngIf="isAdmin"
+  [isOpen]="isModalOpen"
+  [mode]="modalMode"
+  [cargoType]="selectedCargoType"
+  (saved)="onCargoTypeSaved($event)"
+  (close)="closeModal()"
+></app-cargo-type-form-modal>

@@ -1,0 +1,156 @@
+<app-navbar></app-navbar>
+
+<div class="flex">
+  <app-sidebar></app-sidebar>
+
+  <main class="flex-1 bg-gray-50 p-6">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-dark-navy mb-2">Gestión de Conductores</h1>
+      <p class="text-gray-600">Administra el registro de conductores y sus licencias</p>
+    </div>
+
+    <!-- Filtros Rápidos -->
+    <div class="mb-6 flex flex-wrap gap-3">
+      <button
+        (click)="applyLicenseFilter('all')"
+        [class.bg-gold]="licenseFilter === 'all'"
+        [class.text-white]="licenseFilter === 'all'"
+        [class.bg-gray-200]="licenseFilter !== 'all'"
+        class="px-6 py-2 rounded-full font-medium transition"
+      >
+        Todos ({{ licenseStats.vigentes + licenseStats.porVencer + licenseStats.vencidas }})
+      </button>
+      <button
+        (click)="applyLicenseFilter('expiring')"
+        [class.bg-yellow-400]="licenseFilter === 'expiring'"
+        [class.text-white]="licenseFilter === 'expiring'"
+        [class.bg-gray-200]="licenseFilter !== 'expiring'"
+        class="px-6 py-2 rounded-full font-medium transition"
+      >
+        Licencia por Vencer ({{ licenseStats.porVencer }})
+      </button>
+      <button
+        (click)="applyLicenseFilter('expired')"
+        [class.bg-red-500]="licenseFilter === 'expired'"
+        [class.text-white]="licenseFilter === 'expired'"
+        [class.bg-gray-200]="licenseFilter !== 'expired'"
+        class="px-6 py-2 rounded-full font-medium transition"
+      >
+        Licencia Vencida ({{ licenseStats.vencidas }})
+      </button>
+    </div>
+
+    <!-- Search y Agregar -->
+    <div class="mb-6 flex flex-col gap-4 xl:flex-row">
+      <div class="flex flex-1 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2">
+        <span class="text-gray-400">🔍</span>
+        <input
+          type="text"
+          placeholder="Buscar por nombre, cédula o licencia..."
+          (input)="onSearch($event)"
+          class="form-input border-0 px-0 py-0 focus:ring-0"
+        />
+      </div>
+      <button (click)="openAddModal()" class="btn-gold px-6 py-2">
+        + Agregar Conductor
+      </button>
+    </div>
+
+    <div class="table-shell mb-6">
+      <div *ngIf="isLoading" class="p-6 text-center text-gray-500">
+        Cargando conductores...
+      </div>
+
+      <table *ngIf="!isLoading && drivers.length > 0" class="table-base">
+        <thead class="table-head">
+          <tr>
+            <th class="px-4 py-3 text-left">Nombre Completo</th>
+            <th class="px-4 py-3 text-left">Cédula</th>
+            <th class="px-4 py-3 text-left">Teléfono</th>
+            <th class="px-4 py-3 text-left">Correo</th>
+            <th class="px-4 py-3 text-left">N° Licencia</th>
+            <th class="px-4 py-3 text-left">Venc. Licencia</th>
+            <th class="px-4 py-3 text-left">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let driver of drivers" class="border-b border-gray-200 hover:bg-gray-50 transition">
+            <td class="px-4 py-3 text-gray-800">{{ driver.fullName }}</td>
+            <td class="px-4 py-3 text-gray-700">{{ driver.cedula }}</td>
+            <td class="px-4 py-3 text-gray-700">{{ driver.telefono }}</td>
+            <td class="px-4 py-3 text-gray-700">{{ driver.correo }}</td>
+            <td class="px-4 py-3 font-mono text-gray-700">{{ driver.numeroLicencia }}</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-gray-700">{{ driver.fechaVencimientoLicencia | date: 'dd/MM/yyyy' }}</span>
+                <span
+                  [ngClass]="getLicenseBadgeClass(driver.fechaVencimientoLicencia)"
+                >
+                  {{ getLicenseStatusBadge(driver.fechaVencimientoLicencia).text }}
+                </span>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-2">
+                <button
+                  (click)="openEditModal(driver)"
+                  class="btn-outline px-3 py-2 text-sm"
+                  title="Editar"
+                >
+                  ✏️ Editar
+                </button>
+                <button
+                  (click)="deleteDriver(driver.id)"
+                  class="btn-outline px-3 py-2 text-sm text-red-700 border-red-200 hover:bg-red-50"
+                  title="Eliminar"
+                >
+                  🗑️ Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div *ngIf="!isLoading && drivers.length === 0" class="p-6 text-center text-gray-500">
+        No se encontraron conductores.
+      </div>
+    </div>
+
+    <!-- Paginación -->
+    <div class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div class="text-sm text-gray-600">
+        Mostrando {{ getStartIndex() }} - {{ getEndIndex() }} de {{ totalDrivers }} conductores
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          (click)="previousPage()"
+          [disabled]="currentPage === 1"
+          class="btn-outline px-4 py-2"
+        >
+          ← Anterior
+        </button>
+        <div class="text-sm text-gray-600">
+          Página {{ currentPage }} de {{ getTotalPages() }}
+        </div>
+        <button
+          (click)="nextPage()"
+          [disabled]="currentPage >= getTotalPages()"
+          class="btn-outline px-4 py-2"
+        >
+          Siguiente →
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal de Formulario -->
+<app-driver-form-modal
+  [isOpen]="isModalOpen"
+  [mode]="modalMode"
+  [driverData]="selectedDriver"
+  (saved)="onDriverSaved($event)"
+  (close)="closeModal()"
+></app-driver-form-modal>

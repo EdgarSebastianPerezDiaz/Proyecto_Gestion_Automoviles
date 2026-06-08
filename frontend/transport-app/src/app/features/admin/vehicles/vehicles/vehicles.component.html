@@ -1,0 +1,161 @@
+<div class="flex flex-col min-h-screen bg-gray-50">
+  <app-navbar></app-navbar>
+
+  <div class="flex flex-1">
+    <app-sidebar></app-sidebar>
+
+    <main class="flex-1 p-6 lg:p-8">
+      <div class="max-w-7xl mx-auto">
+        <div class="mb-8">
+          <h1 class="text-4xl font-bold text-darkBlue mb-2">Gestión de Vehículos</h1>
+          <p class="text-gray-600">Administra el inventario de vehículos del sistema</p>
+        </div>
+
+        <div class="flex flex-col xl:flex-row gap-4 mb-6 xl:items-center">
+          <div class="flex-1 relative">
+            <span class="absolute left-3 top-3 text-gray-400 text-xl">🔍</span>
+            <input
+              type="text"
+              [value]="searchTerm"
+              (input)="onSearch($event)"
+              placeholder="Buscar por placa, marca o conductor..."
+              class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gold transition bg-white"
+            />
+          </div>
+
+          <button
+            (click)="openAddModal()"
+            class="btn-gold px-6 py-3 rounded-xl font-bold text-white hover:bg-gold-dark transition shadow-sm"
+          >
+            + Agregar Vehículo
+          </button>
+        </div>
+
+        <div class="mb-6 flex flex-wrap gap-3">
+          <button
+            (click)="onFilterChange('todos')"
+            [ngClass]="statusFilter === 'todos' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'"
+            class="px-5 py-2 rounded-full font-semibold transition"
+          >
+            Todos
+          </button>
+          <button
+            (click)="onFilterChange('Disponible')"
+            [ngClass]="statusFilter === 'Disponible' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'"
+            class="px-5 py-2 rounded-full font-semibold transition"
+          >
+            Disponible
+          </button>
+          <button
+            (click)="onFilterChange('En Viaje')"
+            [ngClass]="statusFilter === 'En Viaje' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'"
+            class="px-5 py-2 rounded-full font-semibold transition"
+          >
+            En Viaje
+          </button>
+          <button
+            (click)="onFilterChange('Inactivo')"
+            [ngClass]="statusFilter === 'Inactivo' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'"
+            class="px-5 py-2 rounded-full font-semibold transition"
+          >
+            Inactivo
+          </button>
+        </div>
+
+        <div class="table-shell">
+          <div *ngIf="isLoading" class="p-8 text-center text-gray-500">
+            Cargando vehículos...
+          </div>
+
+          <table *ngIf="!isLoading && vehicles.length > 0" class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">Placa</th>
+                <th class="px-4 py-3 text-left">Marca</th>
+                <th class="px-4 py-3 text-left">Modelo</th>
+                <th class="px-4 py-3 text-left">Cap. (Ton)</th>
+                <th class="px-4 py-3 text-left">Transportista</th>
+                <th class="px-4 py-3 text-left">Conductor Asignado</th>
+                <th class="px-4 py-3 text-left">Estado</th>
+                <th class="px-4 py-3 text-left">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let vehicle of vehicles" class="border-b border-gray-200 hover:bg-gray-50 transition">
+                <td class="px-4 py-3 font-semibold text-darkBlue">{{ vehicle.placa }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ vehicle.marca }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ vehicle.modelo }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ vehicle.capacidad | number:'1.2-2' }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ vehicle.transportistaNombre || 'Sin transportista' }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ vehicle.conductorNombre || 'Sin conductor' }}</td>
+                <td class="px-4 py-3">
+                  <span [ngClass]="getStatusBadgeClass(vehicle.estado)">
+                    {{ vehicle.estado }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      (click)="openEditModal(vehicle)"
+                      class="btn-outline px-3 py-2 text-sm"
+                    >
+                      ✏️ Editar
+                    </button>
+                    <button
+                      (click)="deleteVehicle(vehicle.id)"
+                      class="btn-outline px-3 py-2 text-sm text-red-700 border-red-200 hover:bg-red-50"
+                    >
+                      🗑️ Eliminar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div *ngIf="!isLoading && vehicles.length === 0" class="p-8 text-center text-gray-500">
+            No se encontraron vehículos.
+          </div>
+        </div>
+
+        <div *ngIf="!isLoading && totalVehicles > 0" class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="text-sm text-gray-600">
+            Mostrando {{ getStartIndex() }} - {{ getEndIndex() }} de {{ totalVehicles }} vehículos
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              (click)="previousPage()"
+              [disabled]="!hasPreviousPage()"
+              [ngClass]="hasPreviousPage() ? 'btn-gold' : 'btn-outline'"
+              class="px-4 py-2"
+            >
+              ← Anterior
+            </button>
+
+            <div class="px-3 py-2 text-darkBlue font-semibold">
+              Página {{ currentPage }} de {{ getTotalPages() }}
+            </div>
+
+            <button
+              (click)="nextPage()"
+              [disabled]="!hasNextPage()"
+              [ngClass]="hasNextPage() ? 'btn-gold' : 'btn-outline'"
+              class="px-4 py-2"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<app-vehicle-form-modal
+  [isOpen]="isModalOpen"
+  [mode]="modalMode"
+  [vehicle]="selectedVehicle"
+  (saved)="onVehicleSaved($event)"
+  (close)="closeModal()"
+></app-vehicle-form-modal>

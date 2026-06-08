@@ -1,0 +1,121 @@
+<div class="flex flex-col min-h-screen bg-gray-50">
+  <app-navbar></app-navbar>
+
+  <div class="flex flex-1">
+    <app-sidebar></app-sidebar>
+
+    <main class="flex-1 p-8">
+      <div class="max-w-7xl mx-auto">
+        <div class="mb-8">
+          <h1 class="text-4xl font-bold text-darkBlue mb-2">Gestión de Viajes</h1>
+          <p class="text-gray-600">Administra la creación y seguimiento de viajes</p>
+        </div>
+
+        <div class="flex gap-4 mb-6 items-center">
+          <div class="flex-1 relative">
+            <span class="absolute left-3 top-3 text-gray-400 text-xl">🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar por origen o destino..."
+              (input)="onSearch($event)"
+              class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gold transition"
+            />
+          </div>
+
+          <button
+            *ngIf="isAdmin"
+            (click)="openAddModal()"
+            class="btn-gold px-6 py-2 rounded-lg font-bold text-white hover:bg-gold-dark transition"
+          >
+            + Nuevo Viaje
+          </button>
+        </div>
+
+        <div class="mb-6 flex flex-wrap gap-3">
+          <button (click)="onFilterChange('todos')" [ngClass]="statusFilter === 'todos' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'" class="px-5 py-2 rounded-full font-semibold transition">Todos</button>
+          <button (click)="onFilterChange('Programado')" [ngClass]="statusFilter === 'Programado' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'" class="px-5 py-2 rounded-full font-semibold transition">Programado</button>
+          <button (click)="onFilterChange('En Ruta')" [ngClass]="statusFilter === 'En Ruta' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'" class="px-5 py-2 rounded-full font-semibold transition">En Ruta</button>
+          <button (click)="onFilterChange('Entregado')" [ngClass]="statusFilter === 'Entregado' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'" class="px-5 py-2 rounded-full font-semibold transition">Entregado</button>
+          <button (click)="onFilterChange('Cancelado')" [ngClass]="statusFilter === 'Cancelado' ? 'bg-gold text-white' : 'bg-gray-200 text-gray-700'" class="px-5 py-2 rounded-full font-semibold transition">Cancelado</button>
+        </div>
+
+        <div class="table-shell">
+          <div *ngIf="isLoading" class="p-8 text-center text-gray-500">Cargando viajes...</div>
+
+          <table *ngIf="!isLoading && trips.length > 0" class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">ID</th>
+                <th class="px-4 py-3 text-left">Origen → Destino</th>
+                <th class="px-4 py-3 text-left">Conductor</th>
+                <th class="px-4 py-3 text-left">Vehículo</th>
+                <th class="px-4 py-3 text-left">Fecha Salida</th>
+                <th class="px-4 py-3 text-left">Estado</th>
+                <th *ngIf="isAdmin" class="px-4 py-3 text-left">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let trip of trips" class="border-b border-gray-200 hover:bg-gray-50 transition">
+                <td class="px-4 py-3 font-semibold text-darkBlue">{{ trip.id }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ trip.origenNombre || trip.origin }} → {{ trip.destinoNombre || trip.destination }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ trip.conductorNombre || trip.driver.name }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ trip.vehiculoPlaca || trip.vehicle.plate }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ trip.fechaSalida | date:'dd/MM/yyyy' }}</td>
+                <td class="px-4 py-3">
+                  <span [ngClass]="getStatusClass(trip.estado)">
+                    {{ trip.estado }}
+                  </span>
+                </td>
+                <td *ngIf="isAdmin" class="px-4 py-3">
+                  <div class="flex flex-wrap gap-2">
+                    <button (click)="openEditModal(trip)" class="btn-outline px-3 py-2 text-sm">✏️ Editar</button>
+                    <button (click)="openStatusModal(trip)" [disabled]="getAllowedStatuses(trip.estado).length === 0" class="btn-gold px-3 py-2 text-sm">Cambiar Estado</button>
+                    <button (click)="openDocumentsModal(trip)" class="btn-outline px-3 py-2 text-sm">Ver Documentos</button>
+                    <button (click)="cancelTrip(trip)" [disabled]="trip.estado !== 'Programado' && trip.estado !== 'En Ruta'" class="btn-outline px-3 py-2 text-sm text-red-700 border-red-200 hover:bg-red-50">Cancelar</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div *ngIf="!isLoading && trips.length === 0" class="p-8 text-center text-gray-500">
+            No se encontraron viajes.
+          </div>
+        </div>
+
+        <div *ngIf="!isLoading && total > 0" class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="text-sm text-gray-600">
+            Mostrando {{ getStartIndex() }} - {{ getEndIndex() }} de {{ total }} viajes
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button (click)="previousPage()" [disabled]="currentPage === 1" class="btn-outline px-4 py-2">← Anterior</button>
+            <div class="px-3 py-2 text-darkBlue font-semibold">Página {{ currentPage }} de {{ getTotalPages() }}</div>
+            <button (click)="nextPage()" [disabled]="currentPage >= getTotalPages()" class="btn-outline px-4 py-2">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<app-trip-wizard-modal
+  [isOpen]="isWizardOpen"
+  [mode]="wizardMode"
+  [trip]="selectedTrip"
+  (saved)="onTripSaved()"
+  (close)="closeWizard()"
+></app-trip-wizard-modal>
+
+<app-change-status-modal
+  [isOpen]="isStatusModalOpen"
+  [currentStatus]="changeStatusTrip?.estado || 'Programado'"
+  (statusChanged)="onStatusChanged($event)"
+  (close)="closeStatusModal()"
+></app-change-status-modal>
+
+<app-documents-modal
+  [isOpen]="isDocumentsModalOpen"
+  [tripId]="documentsTripId"
+  (close)="closeDocumentsModal()"
+></app-documents-modal>

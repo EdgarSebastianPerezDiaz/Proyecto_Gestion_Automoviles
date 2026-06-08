@@ -1,0 +1,142 @@
+<div class="min-h-screen bg-gray-100">
+  <!-- Navbar -->
+  <app-navbar></app-navbar>
+
+  <div class="flex">
+    <!-- Sidebar -->
+    <app-sidebar></app-sidebar>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6">
+      <!-- Header -->
+      <div class="mb-8">
+        <h1 class="text-4xl font-bold text-darkBlue">Dashboard — Operador</h1>
+        <p class="text-gray-600 mt-2">{{ getCurrentDate() }} | Última actualización: hace 5 minutos</p>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="isLoading" class="flex justify-center items-center py-12">
+        <div class="animate-spin">
+          <div class="h-12 w-12 border-4 border-gold border-t-transparent rounded-full"></div>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="errorMessage && !isLoading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <p class="text-red-800">{{ errorMessage }}</p>
+      </div>
+
+      <!-- Content -->
+      <div *ngIf="!isLoading && dashboardData" class="space-y-8">
+        <!-- KPI Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <app-kpi-card 
+            *ngFor="let kpi of kpis"
+            [label]="kpi.label"
+            [value]="kpi.value"
+            [unit]="kpi.unit"
+            [icon]="kpi.icon"
+            [color]="kpi.color">
+          </app-kpi-card>
+        </div>
+
+        <!-- Active Trips Section -->
+        <div class="card-brutal p-6">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-lg font-semibold text-darkBlue">Viajes Activos</h2>
+            <button (click)="viewAllTrips()" class="text-gold hover:text-gold-dark text-sm font-medium">
+              Ver todos →
+            </button>
+          </div>
+
+          <!-- Trips Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-darkBlue">ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-darkBlue">Origen – Destino</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-darkBlue">Conductor</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-darkBlue">Vehículo</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-darkBlue">Estado</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-darkBlue">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200">
+                <tr *ngFor="let trip of activeTrips" class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 text-sm font-semibold text-darkBlue">
+                    VJ-{{ trip.id }}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-700">
+                    {{ trip.origin }} – {{ trip.destination }}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-700">
+                    {{ trip.driver.name }}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-700">
+                    {{ trip.vehicle.plate }}
+                  </td>
+                  <td class="px-4 py-3 text-sm">
+                    <span [ngClass]="getStatusColor(trip.status)">
+                      {{ trip.status === 'Completado' ? 'Entregado' : trip.status }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-sm">
+                    <div class="flex gap-2">
+                      <button (click)="changeStatus(trip)" 
+                              class="btn-outline px-2 py-1 text-xs">
+                        Cambiar Estado
+                      </button>
+                      <button (click)="viewDocuments(trip)" 
+                              class="btn-outline px-2 py-1 text-xs text-green-700 border-green-200 hover:bg-green-50">
+                        Ver Documentos
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr *ngIf="activeTrips.length === 0">
+                  <td colspan="6" class="text-center py-8 text-gray-600">No hay viajes activos</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div class="card-brutal p-6">
+          <h2 class="text-lg font-semibold text-darkBlue mb-4">Alertas Recientes</h2>
+          <div class="space-y-3">
+            <div *ngIf="alerts.length === 0" class="text-center py-8">
+              <p class="text-gray-600">No hay alertas en este momento</p>
+            </div>
+
+            <app-alert-item 
+              *ngFor="let alert of alerts"
+              [severity]="alert.severity"
+              [message]="alert.message"
+              [link]="alert.link"
+              [timestamp]="alert.timestamp"
+              (clicked)="handleAlertClick(alert.link)">
+            </app-alert-item>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+          <h2 class="text-lg font-semibold text-darkBlue mb-4">Acciones Rápidas</h2>
+          <div class="flex gap-3 flex-wrap">
+            <button class="btn-gold">
+              Nuevo Viaje
+            </button>
+            <button class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition">
+              Registrar Cumplido
+            </button>
+            <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition">
+              Mi Perfil
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>

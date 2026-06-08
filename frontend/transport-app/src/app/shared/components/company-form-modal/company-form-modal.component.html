@@ -1,0 +1,115 @@
+<app-modal [isOpen]="isOpen" [title]="mode === 'create' ? 'Agregar Empresa' : 'Editar Empresa'" (close)="closeModal()">
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+    
+    <!-- Nombre de la Empresa -->
+    <div>
+      <label for="nombre" class="block text-sm font-medium text-darkBlue mb-1">
+        Nombre de la Empresa *
+      </label>
+      <input
+        id="nombre"
+        type="text"
+        formControlName="nombre"
+        placeholder="Ej. TransCarga S.A."
+        [ngClass]="{'border-red-500': isFieldInvalid('nombre')}"
+        class="form-input"
+      />
+      <p *ngIf="isFieldInvalid('nombre')" class="text-red-500 text-xs mt-1">
+        {{ getFieldError('nombre') }}
+      </p>
+    </div>
+
+    <!-- NIT -->
+    <div>
+      <label for="nit" class="block text-sm font-medium text-darkBlue mb-1">
+        NIT *
+      </label>
+      <input
+        id="nit"
+        type="text"
+        formControlName="nit"
+        placeholder="Ej. 900.112.233-1"
+        [ngClass]="{'border-red-500': isFieldInvalid('nit')}"
+        class="form-input"
+      />
+      <p *ngIf="isFieldInvalid('nit')" class="text-red-500 text-xs mt-1">
+        {{ getFieldError('nit') }}
+      </p>
+    </div>
+
+    <!-- Dirección -->
+    <div>
+      <label for="direccion" class="block text-sm font-medium text-darkBlue mb-1">
+        Dirección *
+      </label>
+      <input
+        id="direccion"
+        type="text"
+        formControlName="direccion"
+        placeholder="Ej. Cra 5 #12-34, Tunja"
+        [ngClass]="{'border-red-500': isFieldInvalid('direccion')}"
+        class="form-input"
+      />
+      <p *ngIf="isFieldInvalid('direccion')" class="text-red-500 text-xs mt-1">
+        {{ getFieldError('direccion') }}
+      </p>
+    </div>
+
+    <!-- Teléfono -->
+    <div>
+      <label for="telefono" class="block text-sm font-medium text-darkBlue mb-1">
+        Teléfono *
+      </label>
+      <input
+        id="telefono"
+        type="tel"
+        formControlName="telefono"
+        placeholder="Ej. (608) 770 0000"
+        [ngClass]="{'border-red-500': isFieldInvalid('telefono')}"
+        class="form-input"
+      />
+      <p *ngIf="isFieldInvalid('telefono')" class="text-red-500 text-xs mt-1">
+        {{ getFieldError('telefono') }}
+      </p>
+    </div>
+
+    <!-- Correo Electrónico -->
+    <div>
+      <label for="correo" class="block text-sm font-medium text-darkBlue mb-1">
+        Correo Electrónico *
+      </label>
+      <input
+        id="correo"
+        type="email"
+        formControlName="correo"
+        placeholder="Ej. contacto@empresa.com"
+        [ngClass]="{'border-red-500': isFieldInvalid('correo')}"
+        class="form-input"
+      />
+      <p *ngIf="isFieldInvalid('correo')" class="text-red-500 text-xs mt-1">
+        {{ getFieldError('correo') }}
+      </p>
+    </div>
+
+    <!-- Leyenda de campos obligatorios -->
+    <p class="text-xs text-gray-500 mb-4">* Campos obligatorios</p>
+
+    <!-- Botones -->
+    <div class="modal-footer">
+      <button
+        type="button"
+        (click)="closeModal()"
+        class="btn-outline"
+      >
+        Cancelar
+      </button>
+      <button
+        type="submit"
+        [disabled]="!form.valid"
+        class="btn-gold"
+      >
+        Guardar Empresa
+      </button>
+    </div>
+  </form>
+</app-modal>

@@ -1,0 +1,127 @@
+<app-modal [isOpen]="isOpen" [title]="mode === 'create' ? 'Agregar Vehículo' : 'Editar Vehículo'" (close)="closeModal()">
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="form-group">
+          <label class="form-label">Placa *</label>
+          <input
+            type="text"
+            formControlName="placa"
+            placeholder="Ej. XYZ-123"
+            class="form-input"
+            [class.border-red-500]="isFieldInvalid('placa')"
+          />
+          <span *ngIf="isFieldInvalid('placa')" class="form-error">
+            {{ getFieldError('placa') }}
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Marca *</label>
+          <input
+            type="text"
+            formControlName="marca"
+            placeholder="Ej. Kenworth"
+            class="form-input"
+            [class.border-red-500]="isFieldInvalid('marca')"
+          />
+          <span *ngIf="isFieldInvalid('marca')" class="form-error">
+            {{ getFieldError('marca') }}
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Modelo *</label>
+          <input
+            type="text"
+            formControlName="modelo"
+            placeholder="Ej. T800"
+            class="form-input"
+            [class.border-red-500]="isFieldInvalid('modelo')"
+          />
+          <span *ngIf="isFieldInvalid('modelo')" class="form-error">
+            {{ getFieldError('modelo') }}
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Capacidad (Ton) *</label>
+          <input
+            type="number"
+            formControlName="capacidad"
+            placeholder="Ej. 32.00"
+            min="0.01"
+            step="0.01"
+            class="form-input"
+            [class.border-red-500]="isFieldInvalid('capacidad')"
+          />
+          <span *ngIf="isFieldInvalid('capacidad')" class="form-error">
+            {{ getFieldError('capacidad') }}
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Estado *</label>
+          <select
+            formControlName="estado"
+            class="form-input"
+            [class.border-red-500]="isFieldInvalid('estado')"
+          >
+            <option value="Disponible">Disponible</option>
+            <option value="En Viaje">En Viaje</option>
+            <option value="Inactivo">Inactivo</option>
+          </select>
+          <span *ngIf="isFieldInvalid('estado')" class="form-error">
+            {{ getFieldError('estado') }}
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Transportista *</label>
+          <select
+            formControlName="transportistaId"
+            class="form-input"
+            [class.border-red-500]="isFieldInvalid('transportistaId')"
+          >
+            <option value="">Selecciona un transportista</option>
+            <option *ngFor="let transportista of transportistas" [value]="transportista.id">{{ transportista.nombre }}</option>
+          </select>
+          <span *ngIf="isFieldInvalid('transportistaId')" class="form-error">
+            {{ getFieldError('transportistaId') }}
+          </span>
+        </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Conductor Asignado</label>
+      <select
+        formControlName="conductorId"
+        class="form-input"
+        [class.border-red-500]="isFieldInvalid('conductorId')"
+      >
+        <option value="">Sin conductor asignado</option>
+        <option *ngFor="let driver of drivers" [value]="driver.id">{{ driver.fullName }}</option>
+      </select>
+      <span *ngIf="isFieldInvalid('conductorId')" class="form-error">
+        {{ getFieldError('conductorId') }}
+      </span>
+    </div>
+
+    <p class="text-sm text-gray-600">* Campos obligatorios</p>
+
+    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+      <button type="button" (click)="closeModal()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition">
+        Cancelar
+      </button>
+      <button
+        type="submit"
+        [disabled]="!form.valid || loadingOptions"
+        [class.opacity-50]="!form.valid || loadingOptions"
+        [class.cursor-not-allowed]="!form.valid || loadingOptions"
+        class="px-4 py-2 rounded-lg font-medium text-white transition"
+        [ngClass]="!form.valid || loadingOptions ? 'bg-gray-400' : 'bg-gold hover:bg-gold-dark'"
+      >
+        Guardar Vehículo
+      </button>
+    </div>
+  </form>
+</app-modal>

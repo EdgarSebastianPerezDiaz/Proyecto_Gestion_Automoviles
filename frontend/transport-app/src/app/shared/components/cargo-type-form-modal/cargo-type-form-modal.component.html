@@ -1,0 +1,72 @@
+<app-modal [isOpen]="isOpen" [title]="mode === 'create' ? 'Agregar Tipo de Carga' : 'Editar Tipo de Carga'" (close)="closeModal()">
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+    <div class="form-group">
+      <label class="form-label">Tipo de Carga *</label>
+      <input
+        type="text"
+        formControlName="nombre"
+        class="form-input"
+        placeholder="Ej. Acero estructural"
+        [class.border-red-500]="isFieldInvalid('nombre')"
+      />
+      <span *ngIf="isFieldInvalid('nombre')" class="form-error">{{ getFieldError('nombre') }}</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Descripción *</label>
+      <textarea
+        formControlName="descripcion"
+        class="form-input"
+        rows="4"
+        placeholder="Ej. Vigas y perfiles laminados en caliente"
+        [class.border-red-500]="isFieldInvalid('descripcion')"
+      ></textarea>
+      <span *ngIf="isFieldInvalid('descripcion')" class="form-error">{{ getFieldError('descripcion') }}</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="form-group">
+        <label class="form-label">Peso (Ton) - Opcional</label>
+        <input
+          type="number"
+          formControlName="pesoReferencia"
+          class="form-input"
+          min="0.01"
+          step="0.01"
+          placeholder="Ej. 28.50"
+          [class.border-red-500]="isFieldInvalid('pesoReferencia')"
+        />
+        <span *ngIf="isFieldInvalid('pesoReferencia')" class="form-error">{{ getFieldError('pesoReferencia') }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Precio / Ton (COP) *</label>
+        <input
+          type="number"
+          formControlName="precioPorTon"
+          class="form-input"
+          min="0.01"
+          step="1"
+          placeholder="Ej. 320000"
+          [class.border-red-500]="isFieldInvalid('precioPorTon')"
+        />
+        <span *ngIf="isFieldInvalid('precioPorTon')" class="form-error">{{ getFieldError('precioPorTon') }}</span>
+      </div>
+    </div>
+
+    <p class="text-sm text-gray-600">* Campos obligatorios</p>
+
+    <div class="modal-footer">
+      <button type="button" (click)="closeModal()" class="btn btn-secondary">Cancelar</button>
+      <button
+        type="submit"
+        [disabled]="!form.valid"
+        [class.opacity-50]="!form.valid"
+        [class.cursor-not-allowed]="!form.valid"
+        class="btn btn-primary"
+      >
+        Guardar Carga
+      </button>
+    </div>
+  </form>
+</app-modal>

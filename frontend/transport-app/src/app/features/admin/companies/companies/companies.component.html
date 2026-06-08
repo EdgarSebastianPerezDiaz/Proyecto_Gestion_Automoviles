@@ -1,0 +1,140 @@
+<div class="flex flex-col min-h-screen bg-gray-50">
+  <!-- Navbar -->
+  <app-navbar></app-navbar>
+
+  <div class="flex flex-1">
+    <!-- Sidebar -->
+    <app-sidebar></app-sidebar>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-8">
+      <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+          <h1 class="text-4xl font-bold text-darkBlue mb-2">Gestión de Empresas</h1>
+          <p class="text-gray-600">Administra el registro de empresas del sistema</p>
+        </div>
+
+        <!-- Top Bar: Search + Add Button -->
+        <div class="flex flex-col md:flex-row gap-4 mb-6 md:items-center">
+          <!-- Search Bar -->
+          <div class="flex-1 relative">
+            <span class="absolute left-3 top-3 text-gray-400 text-xl">🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o NIT..."
+              (input)="onSearch($event)"
+              class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gold transition"
+            />
+          </div>
+
+          <!-- Add Button -->
+          <button
+            (click)="openAddModal()"
+            class="btn-gold px-6 py-2 rounded-lg font-bold text-white hover:bg-gold-dark transition"
+          >
+            + Agregar Empresa
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div *ngIf="isLoading" class="flex justify-center py-8">
+          <p class="text-gray-500">Cargando empresas...</p>
+        </div>
+
+        <!-- Table -->
+        <div *ngIf="!isLoading" class="table-shell">
+          <table class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">Nombre Empresa</th>
+                <th class="px-4 py-3 text-left">NIT</th>
+                <th class="px-4 py-3 text-left">Dirección</th>
+                <th class="px-4 py-3 text-left">Teléfono</th>
+                <th class="px-4 py-3 text-left">Correo</th>
+                <th class="px-4 py-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let company of companies; let last = last" [ngClass]="!last ? 'border-b border-gray-200' : ''" class="hover:bg-gray-50 transition">
+                <td class="px-4 py-3 font-medium text-darkBlue">{{ company.nombre }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ company.nit }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ company.direccion }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ company.telefono }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ company.correo }}</td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex flex-wrap gap-2 justify-center">
+                    <!-- Edit Button -->
+                    <button
+                      (click)="openEditModal(company)"
+                      title="Editar"
+                      class="btn-gold px-3 py-2 text-sm"
+                    >
+                      ✏️ Editar
+                    </button>
+
+                    <!-- Delete Button -->
+                    <button
+                      (click)="deleteCompany(company.id)"
+                      title="Eliminar"
+                      class="btn-outline px-3 py-2 text-sm text-red-700 border-red-200 hover:bg-red-50"
+                    >
+                      🗑️ Eliminar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Empty State -->
+              <tr *ngIf="companies.length === 0">
+                <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                  No hay empresas registradas
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div *ngIf="!isLoading && totalCompanies > 0" class="mt-4 flex items-center justify-between gap-3 text-sm text-gray-600">
+          <div>
+            Mostrando {{ getRecordRange() }} de {{ totalCompanies }} empresas
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              (click)="previousPage()"
+              [disabled]="!hasPreviousPage()"
+              [ngClass]="hasPreviousPage() ? 'btn-gold' : 'btn-outline'"
+              class="px-4 py-2"
+            >
+              ← Anterior
+            </button>
+
+            <div class="px-4 py-2 text-darkBlue font-bold">
+              Página {{ currentPage }} de {{ getTotalPages() }}
+            </div>
+
+            <button
+              (click)="nextPage()"
+              [disabled]="!hasNextPage()"
+              [ngClass]="hasNextPage() ? 'btn-gold' : 'btn-outline'"
+              class="px-4 py-2"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Company Form Modal -->
+<app-company-form-modal
+  [isOpen]="isModalOpen"
+  [mode]="modalMode"
+  [companyData]="selectedCompany"
+  (saved)="onCompanySaved($event)"
+  (close)="closeModal()"
+></app-company-form-modal>

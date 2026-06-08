@@ -1,0 +1,13 @@
+<aside class="w-64 min-h-[calc(100vh-4rem)] flex-col bg-darkBlue text-white shadow-lg md:sticky md:top-16" [ngClass]="isMobileMenuOpen ? 'flex' : 'hidden md:flex'">
+  <nav class="flex-1 p-4">
+    <div
+      *ngFor="let item of menuItems"
+      (click)="navigate(item.path)"
+      class="mb-1 flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm transition-all duration-200 hover:bg-gold-dark hover:shadow-md"
+      [ngClass]="isActive(item.path) ? 'bg-gold font-semibold text-white shadow-md' : 'text-gray-100'"
+    >
+      <span class="text-xl leading-none">{{ item.icon }}</span>
+      <span>{{ item.label }}</span>
+    </div>
+  </nav>
+</aside>

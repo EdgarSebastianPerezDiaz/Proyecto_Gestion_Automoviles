@@ -1,0 +1,95 @@
+<div class="flex flex-col min-h-screen bg-gray-50">
+  <app-navbar></app-navbar>
+
+  <div class="flex flex-1">
+    <app-sidebar></app-sidebar>
+
+    <main class="flex-1 p-8">
+      <div class="max-w-7xl mx-auto">
+        <div class="mb-8">
+          <h1 class="text-4xl font-bold text-darkBlue mb-2">Gestión de EDestino</h1>
+          <p class="text-gray-600">Administra el registro de destinatarios finales</p>
+        </div>
+
+        <div class="flex gap-4 mb-6 items-center">
+          <div class="flex-1 relative">
+            <span class="absolute left-3 top-3 text-gray-400 text-xl">🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o NIT..."
+              (input)="onSearch($event)"
+              class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gold transition"
+            />
+          </div>
+
+          <button
+            (click)="openAddModal()"
+            class="btn-gold px-6 py-2 rounded-lg font-bold text-white hover:bg-gold-dark transition"
+          >
+            + Agregar EDestino
+          </button>
+        </div>
+
+        <div *ngIf="isLoading" class="flex justify-center py-8">
+          <p class="text-gray-500">Cargando destinatarios...</p>
+        </div>
+
+        <div *ngIf="!isLoading" class="table-shell">
+          <table class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">Nombre</th>
+                <th class="px-4 py-3 text-left">NIT</th>
+                <th class="px-4 py-3 text-left">Dirección</th>
+                <th class="px-4 py-3 text-left">Teléfono</th>
+                <th class="px-4 py-3 text-left">Correo</th>
+                <th class="px-4 py-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let recipient of finalRecipients; let last = last" [ngClass]="!last ? 'border-b border-gray-200' : ''" class="hover:bg-gray-50 transition">
+                <td class="px-4 py-3 font-medium text-darkBlue">{{ recipient.nombre }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ recipient.nit }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ recipient.direccion }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ recipient.telefono }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ recipient.correo }}</td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex flex-wrap justify-center gap-2">
+                    <button (click)="openEditModal(recipient)" class="btn-gold px-3 py-2 text-sm">✏️ Editar</button>
+                    <button (click)="deleteFinalRecipient(recipient.id)" class="btn-outline px-3 py-2 text-sm text-red-700 border-red-200 hover:bg-red-50">🗑️ Eliminar</button>
+                  </div>
+                </td>
+              </tr>
+
+              <tr *ngIf="finalRecipients.length === 0">
+                <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                  No hay destinatarios registrados
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div *ngIf="!isLoading && totalFinalRecipients > 0" class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between text-sm text-gray-600">
+          <div>
+            Mostrando {{ getStartIndex() }} - {{ getEndIndex() }} de {{ totalFinalRecipients }} destinatarios
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button (click)="previousPage()" [disabled]="currentPage === 1" class="btn-outline px-4 py-2">← Anterior</button>
+            <div class="px-4 py-2 text-darkBlue font-bold">Página {{ currentPage }} de {{ getTotalPages() }}</div>
+            <button (click)="nextPage()" [disabled]="currentPage >= getTotalPages()" class="btn-outline px-4 py-2">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<app-final-recipient-form-modal
+  [isOpen]="isModalOpen"
+  [mode]="modalMode"
+  [finalRecipient]="selectedFinalRecipient"
+  (saved)="onFinalRecipientSaved($event)"
+  (close)="closeModal()"
+></app-final-recipient-form-modal>

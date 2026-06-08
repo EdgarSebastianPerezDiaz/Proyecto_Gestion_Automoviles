@@ -1,0 +1,101 @@
+<div class="min-h-screen bg-gray-50">
+  <app-navbar></app-navbar>
+  <div class="flex">
+    <app-sidebar></app-sidebar>
+    <main class="flex-1 p-6">
+      <h2 class="mb-4 text-2xl font-semibold text-darkBlue">Auditoría</h2>
+
+      <div class="mb-4 flex flex-wrap gap-2">
+        <button class="btn-outline px-3 py-2" [class.font-bold]="activeTab==='operations'" (click)="switchTab('operations')">Operaciones</button>
+        <button class="btn-outline px-3 py-2" [class.font-bold]="activeTab==='logins'" (click)="switchTab('logins')">Inicios de Sesión</button>
+      </div>
+
+      <div *ngIf="activeTab === 'operations'">
+        <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-center">
+          <input placeholder="🔍 Buscar por tabla, acción o usuario..." (input)="onSearchOp($any($event.target).value)" class="form-input flex-1" />
+          <button class="btn-gold md:ml-3" (click)="exportAllOperations()">📥 Exportar todo a CSV</button>
+        </div>
+
+        <div class="mb-4 flex flex-wrap gap-2">
+          <button (click)="setActionFilter('todos')" [class.font-bold]="actionFilter==='todos'" class="btn-outline px-3 py-2">Todos</button>
+          <button (click)="setActionFilter('INSERT')" [class.font-bold]="actionFilter==='INSERT'" class="btn-outline px-3 py-2 text-green-700 border-green-200 hover:bg-green-50">INSERT</button>
+          <button (click)="setActionFilter('UPDATE')" [class.font-bold]="actionFilter==='UPDATE'" class="btn-outline px-3 py-2 text-blue-700 border-blue-200 hover:bg-blue-50">UPDATE</button>
+          <button (click)="setActionFilter('DELETE')" [class.font-bold]="actionFilter==='DELETE'" class="btn-outline px-3 py-2 text-red-700 border-red-200 hover:bg-red-50">DELETE</button>
+        </div>
+
+        <div class="table-shell">
+          <table class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">Fecha y Hora</th>
+                <th class="px-4 py-3 text-left">Tabla Afectada</th>
+                <th class="px-4 py-3 text-left">ID Registro</th>
+                <th class="px-4 py-3 text-left">Acción</th>
+                <th class="px-4 py-3 text-left">Usuario Responsable</th>
+                <th class="px-4 py-3 text-left">Exportar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let op of operations" class="border-b border-gray-200 hover:bg-gray-50 transition">
+                <td class="px-4 py-3">{{op.fechaHora | date:'dd/MM/yyyy HH:mm:ss'}}</td>
+                <td class="px-4 py-3">{{op.tablaAfectada}}</td>
+                <td class="px-4 py-3">{{op.idRegistroAfectado}}</td>
+                <td class="px-4 py-3"><span [ngClass]="op.accion==='INSERT' ? 'badge-success' : (op.accion==='UPDATE' ? 'badge-info' : 'badge-danger')">{{op.accion}}</span></td>
+                <td class="px-4 py-3">{{op.usuarioResponsable}}</td>
+                <td class="px-4 py-3"><button class="btn-outline px-3 py-2 text-sm" (click)="exportOperationRow(op)">📥</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex items-center justify-between mt-3">
+          <div>
+            Mostrando {{ (totalOperations === 0) ? 0 : ((pageOp-1)*limitOp + 1) }} - {{ Math.min(pageOp*limitOp, totalOperations) }} de {{ totalOperations }} registros
+          </div>
+          <div>
+            <button (click)="prevOp()" [disabled]="pageOp===1" class="px-2 py-1 mr-2">← Anterior</button>
+            <button (click)="nextOp()" [disabled]="pageOp >= Math.ceil(totalOperations/limitOp)" class="px-2 py-1">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="activeTab === 'logins'">
+        <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-center">
+          <input placeholder="🔍 Buscar por usuario..." (input)="onSearchLog($any($event.target).value)" class="form-input flex-1" />
+          <button class="btn-gold md:ml-3" (click)="exportAllLogins()">📥 Exportar todo a CSV</button>
+        </div>
+
+        <div class="table-shell">
+          <table class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">ID Registro</th>
+                <th class="px-4 py-3 text-left">Usuario</th>
+                <th class="px-4 py-3 text-left">Fecha y Hora</th>
+                <th class="px-4 py-3 text-left">Exportar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let l of logins" class="border-b border-gray-200 hover:bg-gray-50 transition">
+                <td class="px-4 py-3">{{l.id}}</td>
+                <td class="px-4 py-3">{{l.usuario}}</td>
+                <td class="px-4 py-3">{{l.fechaHora | date:'dd/MM/yyyy HH:mm:ss'}}</td>
+                <td class="px-4 py-3"><button class="btn-outline px-3 py-2 text-sm" (click)="exportLoginRow(l)">📥</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex items-center justify-between mt-3">
+          <div>
+            Mostrando {{ (totalLogins === 0) ? 0 : ((pageLog-1)*limitLog + 1) }} - {{ Math.min(pageLog*limitLog, totalLogins) }} de {{ totalLogins }} registros
+          </div>
+          <div>
+            <button (click)="prevLog()" [disabled]="pageLog===1" class="px-2 py-1 mr-2">← Anterior</button>
+            <button (click)="nextLog()" [disabled]="pageLog >= Math.ceil(totalLogins/limitLog)" class="px-2 py-1">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>

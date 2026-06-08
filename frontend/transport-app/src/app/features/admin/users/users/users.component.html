@@ -1,0 +1,64 @@
+<div class="min-h-screen bg-gray-50">
+  <app-navbar></app-navbar>
+  <div class="flex">
+    <app-sidebar></app-sidebar>
+    <main class="flex-1 p-6">
+      <div class="mx-auto max-w-7xl">
+        <h2 class="mb-4 text-2xl font-semibold text-darkBlue">Usuarios y Roles</h2>
+
+        <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
+          <input type="text" placeholder="🔍 Buscar por nombre..." (input)="onSearch($any($event.target).value)" class="form-input flex-1" />
+          <button class="btn-gold md:ml-3" (click)="openCreate()">+ Crear Usuario</button>
+        </div>
+
+        <div class="mb-4 flex flex-wrap gap-2">
+          <button class="btn-outline px-3 py-2" [class.font-bold]="roleFilter==='todos'" (click)="setRoleFilter('todos')">Todos</button>
+          <button class="btn-outline px-3 py-2" [class.font-bold]="roleFilter==='administrador'" (click)="setRoleFilter('administrador')">Administrador</button>
+          <button class="btn-outline px-3 py-2" [class.font-bold]="roleFilter==='operario'" (click)="setRoleFilter('operario')">Operario</button>
+        </div>
+
+        <div class="mb-4 border-l-4 border-yellow-400 bg-yellow-50 p-4 text-sm text-yellow-900 rounded-lg">⚠️ El Administrador principal (USR-001) no puede ser eliminado del sistema.</div>
+
+        <div class="table-shell">
+          <table class="table-base">
+            <thead class="table-head">
+              <tr>
+                <th class="px-4 py-3 text-left">ID</th>
+                <th class="px-4 py-3 text-left">Nombre de Usuario</th>
+                <th class="px-4 py-3 text-left">Rol</th>
+                <th class="px-4 py-3 text-left">Último Acceso</th>
+                <th class="px-4 py-3 text-left">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let u of users" class="border-b border-gray-200 hover:bg-gray-50 transition">
+                <td class="px-4 py-3">{{u.id}}</td>
+                <td class="px-4 py-3 font-medium text-darkBlue">{{u.nombre}}</td>
+                <td class="px-4 py-3">
+                  <span [ngClass]="u.rol === 'administrador' ? 'badge-info' : 'badge-success'">{{u.rol}}</span>
+                </td>
+                <td class="px-4 py-3">{{u.ultimoAcceso ? (u.ultimoAcceso | date:'dd/MM/yyyy HH:mm') : '—'}}</td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap gap-2">
+                    <button class="btn-outline px-3 py-2 text-sm" (click)="openEdit(u)">✏️ Editar</button>
+                    <button [disabled]="u.id==='USR-001'" (click)="deleteUser(u)" class="btn-outline px-3 py-2 text-sm text-red-700 border-red-200 hover:bg-red-50">🗑️ Eliminar</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between gap-3 text-sm text-gray-600">
+          <div>Mostrando {{ users.length === 0 ? 0 : ((page-1)*limit + 1) }} - {{ Math.min(page*limit, total) }} de {{ total }} usuarios</div>
+          <div class="flex gap-2">
+            <button (click)="prev()" [disabled]="page===1" class="btn-outline px-3 py-2">← Anterior</button>
+            <button (click)="next()" [disabled]="page*limit >= total" class="btn-outline px-3 py-2">Siguiente →</button>
+          </div>
+        </div>
+
+        <app-user-form-modal *ngIf="showModal" [user]="editingUser" (saved)="onSaved()" (close)="onClose()"></app-user-form-modal>
+      </div>
+    </main>
+  </div>
+</div>
