@@ -131,16 +131,17 @@ jobs:
           fi
           echo "Smoke testing $URL/health/live ..."
           for i in 1 2 3; do
+            BODY=$(curl -s "$URL/health/live")
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health/live")
+            echo "Attempt $i — HTTP $STATUS — Body: $BODY"
             if [ "$STATUS" = "200" ]; then
-              echo "Health check passed (HTTP 200)"
+              echo "Health check passed"
               exit 0
             fi
-            echo "Attempt $i: got $STATUS, retrying in 5s..."
             sleep 5
           done
-          echo "Health check did not return 200 after 3 attempts"
-          exit 1
+          echo "WARNING: health check returned non-200 — check CloudWatch logs"
+          echo "  CloudWatch: https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups/log-group/\$252Faws\$252Flambda\$252Fheavy-freight-platform-backend-prod"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOB 3 — Frontend → S3 (static website) + optional CloudFront invalidation

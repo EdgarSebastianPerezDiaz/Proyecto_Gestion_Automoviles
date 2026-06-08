@@ -8,8 +8,9 @@ This replaces serverless-wsgi with Mangum for FastAPI compatibility.
 from mangum import Mangum
 from main import app
 
-# Create Lambda handler
-handler = Mangum(app, lifespan="off")
+# lifespan="auto" lets FastAPI run startup/shutdown properly.
+# The startup lifespan catches MongoDB failures gracefully when FLASK_ENV != 'production'.
+handler = Mangum(app, lifespan="auto")
 
 if __name__ == "__main__":
     import uvicorn
