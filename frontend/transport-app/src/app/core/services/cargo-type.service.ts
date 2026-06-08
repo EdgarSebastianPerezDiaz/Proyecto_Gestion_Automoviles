@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { delay, map } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface CargoType {
   id: string;
@@ -15,106 +17,49 @@ export interface PaginatedCargoTypes {
   total: number;
 }
 
-const MOCK_CARGO_TYPES: CargoType[] = [
-  {
-    id: 'CAR-001',
-    nombre: 'Acero estructural',
-    descripcion: 'Vigas y perfiles laminados en caliente',
-    pesoReferencia: 28.5,
-    precioPorTon: 320000
-  },
-  {
-    id: 'CAR-002',
-    nombre: 'Chatarra metálica',
-    descripcion: 'Retales y residuos de acero para reciclaje',
-    pesoReferencia: 32,
-    precioPorTon: 180000
-  },
-  {
-    id: 'CAR-003',
-    nombre: 'Tubería industrial',
-    descripcion: 'Tubería de acero para construcción civil',
-    pesoReferencia: 25,
-    precioPorTon: 290000
-  }
-];
-
 @Injectable({
   providedIn: 'root'
 })
 export class CargoTypeService {
-  private cargoTypes: CargoType[] = [...MOCK_CARGO_TYPES];
-  private nextId = 4;
+  private apiUrl = environment.apiUrl;
+
+  constructor(private http: HttpClient) {}
 
   getCargoTypes(page: number = 1, limit: number = 10, search: string = ''): Observable<PaginatedCargoTypes> {
-    return of(null).pipe(
-      delay(300),
-      map(() => {
-        let filtered = [...this.cargoTypes];
+    const params: Record<string, string> = {
+      page: String(page),
+      limit: String(limit)
+    };
+    if (search.trim()) {
+      params['search'] = search.trim();
+    }
 
-        if (search.trim()) {
-          const searchTerm = search.toLowerCase().trim();
-          filtered = filtered.filter(cargoType =>
-            cargoType.nombre.toLowerCase().includes(searchTerm) ||
-            cargoType.descripcion.toLowerCase().includes(searchTerm)
-          );
-        }
-
-        const total = filtered.length;
-        const start = (page - 1) * limit;
-        const items = filtered.slice(start, start + limit).map(cargoType => ({ ...cargoType }));
-
-        return { items, total };
-      })
+    return this.http.get<PaginatedCargoTypes>(`${this.apiUrl}/cargo-types`, { params }).pipe(
+      catchError(() => of({ items: [], total: 0 }))
     );
   }
 
   getCargoTypeById(id: string): Observable<CargoType | undefined> {
-    return of(this.cargoTypes.find(cargoType => cargoType.id === id)).pipe(
-      delay(300),
-      map(cargoType => cargoType ? { ...cargoType } : undefined)
+    return this.http.get<CargoType>(`${this.apiUrl}/cargo-types/${id}`).pipe(
+      catchError(() => of(undefined))
     );
   }
 
   createCargoType(cargoType: Omit<CargoType, 'id'>): Observable<CargoType> {
-    return of(null).pipe(
-      delay(300),
-      map(() => {
-        const created: CargoType = {
-          ...cargoType,
-          id: `CAR-${String(this.nextId).padStart(3, '0')}`
-        };
-        this.nextId++;
-        this.cargoTypes.push(created);
-        return { ...created };
-      })
+    return this.http.post<CargoType>(`${this.apiUrl}/cargo-types`, cargoType).pipe(
+      catchError(() => of({ id: '', ...cargoType }))
     );
   }
 
   updateCargoType(id: string, updates: Partial<CargoType>): Observable<CargoType> {
-    return of(null).pipe(
-      delay(300),
-      map(() => {
-        const index = this.cargoTypes.findIndex(cargoType => cargoType.id === id);
-        if (index === -1) {
-          throw new Error(`CargoType with id ${id} not found`);
-        }
-
-        this.cargoTypes[index] = { ...this.cargoTypes[index], ...updates, id };
-        return { ...this.cargoTypes[index] };
-      })
+    return this.http.put<CargoType>(`${this.apiUrl}/cargo-types/${id}`, updates).pipe(
+      catchError(() => of({ id, nombre: '', descripcion: '', precioPorTon: 0, ...updates }))
     );
   }
 
   deleteCargoType(id: string): Observable<void> {
-    return of(null).pipe(
-      delay(300),
-      map(() => {
-        const index = this.cargoTypes.findIndex(cargoType => cargoType.id === id);
-        if (index > -1) {
-          this.cargoTypes.splice(index, 1);
-        }
-      })
+    return this.http.delete<void>(`${this.apiUrl}/cargo-types/${id}`).pipe(
+      catchError(() => of(undefined as void))
     );
   }
 }

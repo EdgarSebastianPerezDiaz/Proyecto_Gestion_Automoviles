@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { delay, map } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface Transportista {
   id: string;
@@ -12,68 +14,41 @@ export interface Transportista {
   tipoDocumento?: 'NIT' | 'Cédula';
 }
 
-const MOCK_TRANSPORTISTAS: Transportista[] = [
-  { id: 'T1', nombre: 'Jaime Galindo Transportes', nit: '12.345.678-9', direccion: 'Calle 10 #5-67, Sogamoso', telefono: '310 555 0001', correo: 'jaime@galindo.com', tipoDocumento: 'Cédula' },
-  { id: 'T2', nombre: 'Avance MC S.A.S.', nit: '98.765.432-1', direccion: 'Cra 20 #15-30, Duitama', telefono: '315 555 0004', correo: 'contacto@avancemc.com', tipoDocumento: 'NIT' }
-];
-
 @Injectable({
   providedIn: 'root'
 })
 export class TransportistaService {
-  private transportistas: Transportista[] = [...MOCK_TRANSPORTISTAS];
-  private nextId = 3;
+  private apiUrl = environment.apiUrl;
+
+  constructor(private http: HttpClient) {}
 
   getAll(): Observable<Transportista[]> {
-    return of(this.transportistas.map(transportista => ({ ...transportista }))).pipe(delay(300));
+    return this.http.get<Transportista[]>(`${this.apiUrl}/clients`).pipe(
+      catchError(() => of([]))
+    );
   }
 
   getById(id: string): Observable<Transportista | undefined> {
-    return of(this.transportistas.find(transportista => transportista.id === id)).pipe(
-      delay(300),
-      map(transportista => transportista ? { ...transportista } : undefined)
+    return this.http.get<Transportista>(`${this.apiUrl}/clients/${id}`).pipe(
+      catchError(() => of(undefined))
     );
   }
 
   create(transportista: Omit<Transportista, 'id'>): Observable<Transportista> {
-    return of(null).pipe(
-      delay(300),
-      map(() => {
-        const created: Transportista = {
-          ...transportista,
-          id: `T${this.nextId}`
-        };
-        this.nextId++;
-        this.transportistas.push(created);
-        return { ...created };
-      })
+    return this.http.post<Transportista>(`${this.apiUrl}/clients`, transportista).pipe(
+      catchError(() => of({ id: '', ...transportista }))
     );
   }
 
   update(id: string, updates: Partial<Transportista>): Observable<Transportista> {
-    return of(null).pipe(
-      delay(300),
-      map(() => {
-        const index = this.transportistas.findIndex(transportista => transportista.id === id);
-        if (index === -1) {
-          throw new Error(`Transportista with id ${id} not found`);
-        }
-
-        this.transportistas[index] = { ...this.transportistas[index], ...updates, id };
-        return { ...this.transportistas[index] };
-      })
+    return this.http.put<Transportista>(`${this.apiUrl}/clients/${id}`, updates).pipe(
+      catchError(() => of({ id, nombre: '', nit: '', direccion: '', telefono: '', correo: '', ...updates }))
     );
   }
 
   delete(id: string): Observable<void> {
-    return of(null).pipe(
-      delay(300),
-      map(() => {
-        const index = this.transportistas.findIndex(transportista => transportista.id === id);
-        if (index > -1) {
-          this.transportistas.splice(index, 1);
-        }
-      })
+    return this.http.delete<void>(`${this.apiUrl}/clients/${id}`).pipe(
+      catchError(() => of(undefined as void))
     );
   }
 }
