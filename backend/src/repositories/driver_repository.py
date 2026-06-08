@@ -160,9 +160,11 @@ class DriverRepository(BaseRepository):
         
         # Calculate new status
         license_alert, license_expired = calculate_license_status(license_expiry)
-        
-        # Update driver document using BaseRepository method
-        return self.update_one(
+
+        # Use matched_count (not modified_count) so the method returns True
+        # even when the calculated status is identical to the stored values.
+        collection = self.connection.get_collection(self.collection_name)
+        result = collection.update_one(
             {'_id': ObjectId(driver_id)},
             {'$set': {
                 'license_alert': license_alert,
@@ -170,6 +172,7 @@ class DriverRepository(BaseRepository):
                 'updated_at': datetime.now(timezone.utc)
             }}
         )
+        return result.matched_count > 0
     
     def get_available_drivers(self) -> list[dict]:
         """
