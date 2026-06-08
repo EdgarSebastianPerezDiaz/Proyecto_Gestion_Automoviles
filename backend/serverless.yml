@@ -91,7 +91,7 @@ plugins:
 
 custom:
   pythonRequirements:
-    dockerizePip: false
+    dockerizePip: true      # compile inside Amazon Linux container to match Lambda GLIBC
     slim: true
     strip: false
     layer: false
