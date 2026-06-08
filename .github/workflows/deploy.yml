@@ -137,6 +137,8 @@ jobs:
     name: Deploy Frontend → S3
     runs-on: ubuntu-latest
     needs: deploy-backend
+    env:
+      CLOUDFRONT_DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -216,10 +218,10 @@ jobs:
             --cache-control "no-cache,no-store,must-revalidate"
 
       - name: Invalidate CloudFront cache (if distribution configured)
-        if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        if: env.CLOUDFRONT_DIST_ID != ''
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --distribution-id "$CLOUDFRONT_DIST_ID" \
             --paths "/*"
 
       - name: Print frontend URL
@@ -228,6 +230,6 @@ jobs:
         run: |
           echo "Frontend URL (S3 website):"
           echo "  http://${BUCKET}.s3-website-${AWS_REGION}.amazonaws.com"
-          if [ -n "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" ]; then
+          if [ -n "$CLOUDFRONT_DIST_ID" ]; then
             echo "CloudFront invalidation triggered — wait ~1 min for propagation."
           fi
