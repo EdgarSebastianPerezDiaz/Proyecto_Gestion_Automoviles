@@ -35,7 +35,8 @@ provider:
   
   # Environment variables (from .env in dev, from AWS Parameter Store in prod)
   environment:
-    FLASK_ENV: ${self:provider.stage}
+    # APP_ENV drives validation logic in main.py (must be 'production' on Lambda)
+    FLASK_ENV: production
     MONGO_URI: ${env:MONGO_URI, ''}
     JWT_SECRET_KEY: ${env:JWT_SECRET_KEY, ''}
     CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:4200'}
@@ -91,7 +92,11 @@ plugins:
 
 custom:
   pythonRequirements:
-    dockerizePip: true      # compile inside Amazon Linux container to match Lambda GLIBC
+    # non-linux: true uses manylinux wheels (pre-compiled) - works in GitHub Actions
+    # without needing the Docker daemon. For packages with C extensions that
+    # don't have manylinux wheels, switch to dockerizePip: true and ensure
+    # Docker is available in the CI runner.
+    dockerizePip: non-linux
     slim: true
     strip: false
     layer: false
