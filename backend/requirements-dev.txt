@@ -1,3 +1,7 @@
+Flask==3.0.3
+Flask-CORS==4.0.1
+serverless-wsgi==3.1.0
+freezegun==1.5.1
 pytest==8.0.2
 pytest-cov==5.0.0
 mongomock==4.2.0.post1

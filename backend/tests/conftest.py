@@ -16,22 +16,25 @@ from unittest.mock import Mock, patch
 # ═══════════════════════════════════════════════════════════════════════════
 
 def pytest_configure(config):
-    """
-    Pytest hook that runs before any tests.
-    Sets up the global testing environment.
-    """
-    # Set testing mode globally
+    """Pytest hook: sets up testing environment and registers custom markers."""
+    # Testing environment
     os.environ['FLASK_ENV'] = 'testing'
     os.environ['LOG_LEVEL'] = 'WARNING'
     os.environ['TESTING'] = 'true'
-    
-    # Set dummy credentials for testing
+
+    # Dummy credentials — never real values
     os.environ.setdefault('MONGO_URI', 'mongodb://localhost:27017/heavy_freight_test')
     os.environ.setdefault('JWT_SECRET_KEY', 'test_secret_key_for_testing_only')
     os.environ.setdefault('JWT_ALGORITHM', 'HS256')
     os.environ.setdefault('JWT_EXPIRATION_HOURS', '8')
     os.environ.setdefault('BCRYPT_ROUNDS', '4')
     os.environ.setdefault('CORS_ORIGIN', 'http://localhost:4200')
+
+    # Custom markers
+    config.addinivalue_line("markers", "unit: mark test as unit test")
+    config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line("markers", "slow: mark test as slow")
+    config.addinivalue_line("markers", "api: mark test as API endpoint test")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -317,18 +320,6 @@ def freeze_time():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Markers
-# ═══════════════════════════════════════════════════════════════════════════
-
-def pytest_configure(config):
-    """Register custom pytest markers."""
-    config.addinivalue_line("markers", "unit: mark test as unit test")
-    config.addinivalue_line("markers", "integration: mark test as integration test")
-    config.addinivalue_line("markers", "slow: mark test as slow")
-    config.addinivalue_line("markers", "api: mark test as API endpoint test")
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # Assertion Helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -382,20 +373,19 @@ def db_connection(app):
 @pytest.fixture
 def auth_headers_operator(app):
     """Create auth headers for an operator user."""
-    import jwt
-    import os
+    from jose import jwt
     from datetime import datetime, timedelta, timezone
-    
+
     secret = os.getenv('JWT_SECRET_KEY', 'test_secret_key_for_testing_only')
     algorithm = os.getenv('JWT_ALGORITHM', 'HS256')
-    
+
     payload = {
         'user_id': 'operator@example.com',
         'role': 'operator',
         'iat': datetime.now(timezone.utc),
         'exp': datetime.now(timezone.utc) + timedelta(hours=8)
     }
-    
+
     token = jwt.encode(payload, secret, algorithm=algorithm)
     return {"Authorization": f"Bearer {token}"}
 
@@ -403,20 +393,19 @@ def auth_headers_operator(app):
 @pytest.fixture
 def auth_headers_operator2(app):
     """Create auth headers for a second operator user."""
-    import jwt
-    import os
+    from jose import jwt
     from datetime import datetime, timedelta, timezone
-    
+
     secret = os.getenv('JWT_SECRET_KEY', 'test_secret_key_for_testing_only')
     algorithm = os.getenv('JWT_ALGORITHM', 'HS256')
-    
+
     payload = {
         'user_id': 'operator2@example.com',
         'role': 'operator',
         'iat': datetime.now(timezone.utc),
         'exp': datetime.now(timezone.utc) + timedelta(hours=8)
     }
-    
+
     token = jwt.encode(payload, secret, algorithm=algorithm)
     return {"Authorization": f"Bearer {token}"}
 
@@ -424,10 +413,9 @@ def auth_headers_operator2(app):
 @pytest.fixture
 def auth_headers_admin(app):
     """Create auth headers for an admin user."""
-    import jwt
-    import os
+    from jose import jwt
     from datetime import datetime, timedelta, timezone
-    
+
     secret = os.getenv('JWT_SECRET_KEY', 'test_secret_key_for_testing_only')
     algorithm = os.getenv('JWT_ALGORITHM', 'HS256')
     

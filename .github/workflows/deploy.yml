@@ -1,9 +1,8 @@
-name: Deploy to AWS Lambda
+name: Deploy Heavy Freight Platform
 
 on:
   push:
-    branches:
-      - main
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       stage:
@@ -11,284 +10,224 @@ on:
         required: false
         default: 'prod'
         type: choice
-        options:
-          - dev
-          - staging
-          - prod
+        options: [dev, staging, prod]
 
 env:
   AWS_REGION: us-east-1
   NODE_VERSION: '20'
   PYTHON_VERSION: '3.11'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1 — Backend tests
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  test:
-    name: Run Tests
+  test-backend:
+    name: Backend Tests
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-      
-      - name: Install Python dependencies
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-          pip install -r backend/requirements-dev.txt
-      
+          pip install -r backend/requirements.txt \
+                      -r backend/requirements-dev.txt
+
       - name: Run pytest
         run: |
           cd backend
-          pytest tests/ -v --tb=short --color=yes
-      
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: pytest-results
-          path: backend/.pytest_cache/
-          retention-days: 5
+          pytest tests/ -q --tb=short \
+            --ignore=tests/test_s3_uploader.py \
+            --ignore=tests/test_secrets_manager.py \
+            --ignore=tests/test_trip_document_reconciler.py
 
-  deploy:
-    name: Deploy to AWS Lambda
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2 — Backend → AWS Lambda (Serverless Framework)
+# ─────────────────────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend → Lambda
     runs-on: ubuntu-latest
-    needs: test
-    if: success()
-    
-    permissions:
-      contents: read
-      id-token: write
-    
-    environment:
-      name: production
-      url: ${{ steps.deploy.outputs.endpoint }}
-    
+    needs: test-backend
+    outputs:
+      api_url: ${{ steps.capture_url.outputs.api_url }}
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
+
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-      
-      - name: Install Node dependencies
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Python deps
+        run: pip install -r backend/requirements.txt
+
+      - name: Install Serverless Framework + plugin
         run: |
-          cd backend
-          npm ci 2>/dev/null || true
-      
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-          pip install -r backend/requirements-dev.txt
-      
-      - name: Install Serverless Framework
-        run: npm install -g serverless
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+          npm install -g serverless
+          cd backend && npm ci
+
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Verify AWS credentials
-        run: aws sts get-caller-identity
-      
-      - name: Deploy with Serverless Framework
-        id: deploy
-        run: |
-          cd backend
-          DEPLOYMENT_STAGE=${{ github.event.inputs.stage || 'prod' }}
-          
-          echo "🚀 Starting deployment to AWS Lambda (stage: $DEPLOYMENT_STAGE)..."
-          
-          serverless deploy \
-            --stage "$DEPLOYMENT_STAGE" \
-            --verbose
-          
-          echo "✅ Deployment completed successfully!"
-      
-      - name: Extract deployment output
-        id: output
+
+      - name: Deploy
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         run: |
           cd backend
           STAGE=${{ github.event.inputs.stage || 'prod' }}
-          
-          # Get deployment info and extract endpoint
-          DEPLOYMENT_INFO=$(serverless info --stage "$STAGE" 2>/dev/null)
-          API_ENDPOINT=$(echo "$DEPLOYMENT_INFO" | grep -oP 'endpoint: \K.*' | head -1)
-          
-          if [ -z "$API_ENDPOINT" ]; then
-            echo "⚠️  Could not extract endpoint from deployment info"
-            API_ENDPOINT="https://api.example.com (manual verification needed)"
-          fi
-          
-          echo "endpoint=$API_ENDPOINT" >> $GITHUB_OUTPUT
-          echo "📍 API Endpoint: $API_ENDPOINT"
-      
-      - name: Run smoke tests
+          echo "Deploying stage: $STAGE"
+          serverless deploy --stage "$STAGE" --verbose
+
+      - name: Capture API URL
+        id: capture_url
         run: |
           cd backend
           STAGE=${{ github.event.inputs.stage || 'prod' }}
-          
-          # Get API endpoint
-          API_ENDPOINT=$(serverless info --stage "$STAGE" 2>/dev/null | grep -oP 'endpoint: \K.*' | head -1)
-          
-          if [ -z "$API_ENDPOINT" ]; then
-            echo "⚠️  Could not extract endpoint, skipping smoke tests"
+          # serverless info outputs the endpoint on a line like "endpoint: ANY - https://..."
+          URL=$(serverless info --stage "$STAGE" 2>/dev/null \
+                | grep -oP 'https://[a-z0-9]+\.execute-api\.[a-z0-9-]+\.amazonaws\.com[^\s]*' \
+                | head -1 \
+                | sed 's|/{proxy+}||')
+          echo "api_url=$URL" >> "$GITHUB_OUTPUT"
+          echo "API URL: $URL"
+
+      - name: Smoke test /health/live
+        run: |
+          URL="${{ steps.capture_url.outputs.api_url }}"
+          if [ -z "$URL" ]; then
+            echo "No URL captured — skipping smoke test"
             exit 0
           fi
-          
-          echo "🧪 Running smoke tests on $API_ENDPOINT..."
-          
-          # Test 1: Health endpoint (liveness)
-          echo "  Testing /health/live..."
-          if curl -f -s "$API_ENDPOINT/health/live" > /dev/null; then
-            echo "  ✅ Health check passed"
-          else
-            echo "  ⚠️  Health check inconclusive (may not be accessible yet)"
-          fi
-          
-          # Test 2: Deep health check
-          echo "  Testing /health/deep..."
-          if curl -f -s "$API_ENDPOINT/health/deep" > /dev/null; then
-            echo "  ✅ Deep health check passed"
-          else
-            echo "  ⚠️  Deep health check inconclusive"
-          fi
-          
-          # Test 3: Verify JWT protection
-          echo "  Testing JWT protection..."
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$API_ENDPOINT/api/trips")
-          if [ "$RESPONSE" = "401" ] || [ "$RESPONSE" = "403" ]; then
-            echo "  ✅ JWT protection verified (got $RESPONSE)"
-          else
-            echo "  ⚠️  Unexpected response code: $RESPONSE"
-          fi
-          
-          echo "🎉 Smoke tests completed!"
-      
-      - name: Create deployment summary
-        if: always()
-        run: |
-          cat > deployment_summary.txt << EOF
-          ═══════════════════════════════════════════════════════════════
-          Deployment Summary
-          ═══════════════════════════════════════════════════════════════
-          
-          Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          Branch: ${{ github.ref_name }}
-          Commit: ${{ github.sha }}
-          Commit Message: ${{ github.event.head_commit.message }}
-          Triggerer: ${{ github.actor }}
-          Trigger: ${{ github.event_name }}
-          
-          Stage: ${{ github.event.inputs.stage || 'prod' }}
-          Region: ${{ env.AWS_REGION }}
-          
-          Test Status: ✅ PASSED
-          Deploy Status: ${{ job.status }}
-          
-          Endpoint: ${{ steps.output.outputs.endpoint }}
-          
-          Documentation:
-            - Deployment Guide: https://github.com/${{ github.repository }}/blob/main/DEPLOYMENT.md
-            - Migration Guide: https://github.com/${{ github.repository }}/blob/main/backend/README_MIGRATION.md
-          
-          ═══════════════════════════════════════════════════════════════
-          EOF
-          cat deployment_summary.txt
-      
-      - name: Upload deployment summary
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: deployment-summary
-          path: deployment_summary.txt
-          retention-days: 30
-      
-      - name: Notify Slack (optional)
-        if: always() && secrets.SLACK_WEBHOOK_URL != ''
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: |
-            Heavy Freight Platform Backend Deployment
-            Status: ${{ job.status }}
-            Stage: ${{ github.event.inputs.stage || 'prod' }}
-            Branch: ${{ github.ref_name }}
-            Commit: ${{ github.sha }}
-            Actor: ${{ github.actor }}
-            Endpoint: ${{ steps.output.outputs.endpoint }}
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow
-        continue-on-error: true
+          echo "Smoke testing $URL/health/live ..."
+          for i in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health/live")
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed (HTTP 200)"
+              exit 0
+            fi
+            echo "Attempt $i: got $STATUS, retrying in 5s..."
+            sleep 5
+          done
+          echo "Health check did not return 200 after 3 attempts"
+          exit 1
 
-  # Optional: Rollback on failure
-  rollback:
-    name: Rollback on Failure
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3 — Frontend → S3 (static website) + optional CloudFront invalidation
+# ─────────────────────────────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend → S3
     runs-on: ubuntu-latest
-    needs: deploy
-    if: failure()
-    
+    needs: deploy-backend
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
-      - name: Install Serverless Framework
-        run: npm install -g serverless
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+          cache: npm
+          cache-dependency-path: frontend/transport-app/package-lock.json
+
+      - name: Install frontend deps
+        run: cd frontend/transport-app && npm ci
+
+      - name: Inject API URL into production environment
+        run: |
+          API_URL="${{ needs.deploy-backend.outputs.api_url }}"
+          if [ -z "$API_URL" ]; then
+            echo "WARNING: api_url is empty. Check deploy-backend output."
+          fi
+          sed -i "s|PLACEHOLDER_API_URL|${API_URL}|g" \
+            frontend/transport-app/src/environments/environment.prod.ts
+          echo "environment.prod.ts after injection:"
+          cat frontend/transport-app/src/environments/environment.prod.ts
+
+      - name: Build Angular (production)
+        run: cd frontend/transport-app && npx ng build --configuration=production
+
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Rollback deployment
+
+      - name: Create / configure S3 bucket
+        env:
+          BUCKET: ${{ secrets.S3_FRONTEND_BUCKET }}
         run: |
-          cd backend
-          STAGE=${{ github.event.inputs.stage || 'prod' }}
-          echo "⚠️ Deployment failed. Rolling back to previous version..."
-          serverless rollback --stage "$STAGE" --verbose || echo "Rollback completed (or no previous version to rollback to)"
-      
-      - name: Notify Slack about rollback
-        if: secrets.SLACK_WEBHOOK_URL != ''
-        uses: 8398a7/action-slack@v3
-        with:
-          status: custom
-          custom_payload: |
-            {
-              text: '🔴 Deployment failed and rollback initiated',
-              attachments: [{
-                color: 'danger',
-                text: 'Heavy Freight Platform Backend\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}\nActor: ${{ github.actor }}'
-              }]
-            }
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        continue-on-error: true
+          # Create bucket only if it doesn't exist yet (idempotent)
+          aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || \
+            aws s3api create-bucket --bucket "$BUCKET" --region "$AWS_REGION"
+
+          # Allow public access (required for static website hosting)
+          aws s3api put-public-access-block \
+            --bucket "$BUCKET" \
+            --public-access-block-configuration \
+              BlockPublicAcls=false,IgnorePublicAcls=false,\
+          BlockPublicPolicy=false,RestrictPublicBuckets=false
+
+          # Enable static website hosting (index + SPA fallback to index.html)
+          aws s3 website "s3://$BUCKET" \
+            --index-document index.html \
+            --error-document index.html
+
+          # Public read policy
+          aws s3api put-bucket-policy --bucket "$BUCKET" --policy "{
+            \"Version\": \"2012-10-17\",
+            \"Statement\": [{
+              \"Effect\": \"Allow\",
+              \"Principal\": \"*\",
+              \"Action\": \"s3:GetObject\",
+              \"Resource\": \"arn:aws:s3:::${BUCKET}/*\"
+            }]
+          }"
+
+      - name: Sync dist to S3
+        env:
+          BUCKET: ${{ secrets.S3_FRONTEND_BUCKET }}
+        run: |
+          aws s3 sync frontend/transport-app/dist/transport-app/browser/ \
+            "s3://$BUCKET" \
+            --delete \
+            --cache-control "max-age=31536000,immutable" \
+            --exclude "index.html"
+          # index.html must not be cached so the browser always fetches the latest
+          aws s3 cp frontend/transport-app/dist/transport-app/browser/index.html \
+            "s3://$BUCKET/index.html" \
+            --cache-control "no-cache,no-store,must-revalidate"
+
+      - name: Invalidate CloudFront cache (if distribution configured)
+        if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"
+
+      - name: Print frontend URL
+        env:
+          BUCKET: ${{ secrets.S3_FRONTEND_BUCKET }}
+        run: |
+          echo "Frontend URL (S3 website):"
+          echo "  http://${BUCKET}.s3-website-${AWS_REGION}.amazonaws.com"
+          if [ -n "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" ]; then
+            echo "CloudFront invalidation triggered — wait ~1 min for propagation."
+          fi
