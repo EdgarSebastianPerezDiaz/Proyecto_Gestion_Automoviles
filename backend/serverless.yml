@@ -14,11 +14,34 @@ provider:
   
   # Logging and tracing
   logs:
-    restApi:
+    httpApi:
       level: INFO
-      fullRequestResponse: false
-      roleArn: !GetAtt ApiGatewayRole.Arn
+      format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":$context.status,"protocol":"$context.protocol","responseLength":$context.responseLength,"error":"$context.error.messageString","integrationLatency":$context.integration.latency}'
     frameworkLambda: true
+  
+  # HTTP API (v2) Configuration for cost optimization and lower latency
+  httpApi:
+    payload: '2.0'
+    cors:
+      allowedOrigins:
+        - ${ssm:/heavy-freight/${self:provider.stage}/CORS_ORIGIN~true, 'http://localhost:4200'}
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+        - X-Requested-With
+        - X-Correlation-ID
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowCredentials: true
+      maxAge: 600
+      exposedHeaders:
+        - X-Correlation-ID
+        - X-RateLimit-Remaining
   
   # Environment variables from SSM Parameter Store
   environment:
@@ -77,14 +100,7 @@ functions:
   api:
     handler: wsgi.handler
     events:
-      - http:
-          path: /
-          method: ANY
-          cors: true
-      - http:
-          path: /{proxy+}
-          method: ANY
-          cors: true
+      - httpApi: '*'  # HTTP API v2 - handles all routes and methods
     layers:
       - !Ref PythonRequirementsLambdaLayer
     timeout: 30
@@ -92,7 +108,7 @@ functions:
     ephemeralStorage: 512
     provisionedConcurrency: ${self:custom.provisionedConcurrency.${self:provider.stage}, 1}
     environment:
-      API_URL: !Sub 'https://${ApiGatewayRestApi}.execute-api.${aws:region}.amazonaws.com/${self:provider.stage}'
+      API_URL: !Sub 'https://${HttpApi}.execute-api.${aws:region}.amazonaws.com'
   
   # Keep-warm Lambda function (prevents cold starts)
   keepWarm:
@@ -104,7 +120,7 @@ functions:
     timeout: 10
     memorySize: 128
     environment:
-      API_URL: !Sub 'https://${ApiGatewayRestApi}.execute-api.${aws:region}.amazonaws.com/${self:provider.stage}'
+      API_URL: !Sub 'https://${HttpApi}.execute-api.${aws:region}.amazonaws.com/health/live'
   
   # Trip Document Reconciler Lambda (hourly scheduled task)
   tripDocumentReconciler:
@@ -263,19 +279,9 @@ resources:
           - Key: Stage
             Value: ${self:provider.stage}
     
-    # API Gateway Role for CloudWatch
-    ApiGatewayRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service: apigateway.amazonaws.com
-              Action: 'sts:AssumeRole'
-        ManagedPolicyArns:
-          - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
+    # HTTP API logging role (optional - HTTP API handles logging automatically)
+    # No longer needed with HTTP API v2 - logging is configured directly in provider.logs.httpApi
+
 
   Outputs:
     DocumentBucketName:
@@ -285,8 +291,8 @@ resources:
         Name: !Sub '${self:service}-${self:provider.stage}-bucket'
     
     ApiEndpoint:
-      Description: API Gateway endpoint URL
-      Value: !Sub 'https://${ApiGatewayRestApi}.execute-api.${aws:region}.amazonaws.com/${self:provider.stage}'
+      Description: HTTP API (v2) endpoint URL - Note: HTTP API does not use stage in URL path
+      Value: !Sub 'https://${HttpApi}.execute-api.${aws:region}.amazonaws.com'
       Export:
         Name: !Sub '${self:service}-${self:provider.stage}-endpoint'
     
