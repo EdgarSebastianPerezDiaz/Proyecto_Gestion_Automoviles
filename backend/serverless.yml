@@ -4,7 +4,7 @@ frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: python3.12
+  runtime: python3.11
   region: ${opt:region, 'us-east-1'}
   stage: ${opt:stage, 'dev'}
   
@@ -32,9 +32,6 @@ provider:
         - OPTIONS
       allowCredentials: true
       maxAge: 600
-      exposedHeaders:
-        - X-Correlation-ID
-        - X-RateLimit-Remaining
   
   # Environment variables (from .env in dev, from AWS Parameter Store in prod)
   environment:
@@ -42,7 +39,6 @@ provider:
     MONGO_URI: ${env:MONGO_URI, ''}
     JWT_SECRET_KEY: ${env:JWT_SECRET_KEY, ''}
     CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:4200'}
-    AWS_REGION: ${self:provider.region}
     LOG_LEVEL: INFO
   
   # IAM Role with minimal permissions
