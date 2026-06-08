@@ -107,54 +107,54 @@ class RateLimiter:
                 f"Could not connect to MongoDB for rate limiting: {str(e)}"
             ) from e
     
-    def is_allowed(self, ip: str, endpoint: str) -> bool:
+    def is_allowed(
+        self,
+        ip: str,
+        endpoint: str,
+        max_attempts: Optional[int] = None,
+        window_seconds: Optional[int] = None,
+    ) -> bool:
         """
         Check if a request from an IP to an endpoint is allowed.
-        
-        Logic:
-        1. If blocked_until > now, return False (still blocked)
-        2. If attempts >= max_attempts within window, don't increment and block
-        3. Otherwise, increment attempt counter and return True
-        
-        Allows exactly max_attempts requests before blocking (e.g., 5 allowed, 6th blocked).
-        
+
         Args:
-            ip: Client IP address (from request.remote_addr)
-            endpoint: API endpoint (from request.endpoint)
-            
+            ip: Client IP address
+            endpoint: API endpoint name
+            max_attempts: Override instance max_attempts (optional)
+            window_seconds: Override window in seconds (optional)
+
         Returns:
-            bool: True if request is allowed, False if rate limited
-            
-        Raises:
-            RuntimeError: If MongoDB collection not initialized
+            bool: True if allowed, False if rate-limited.
+                  Returns True (fail-open) when MongoDB is not connected.
         """
         if not self._initialized or self.collection is None:
-            raise RuntimeError(
-                "RateLimiter not initialized. Call connect() during app startup."
-            )
+            # Fail-open: let requests through when rate-limiter has no DB connection
+            return True
+
+        effective_max = max_attempts if max_attempts is not None else self.max_attempts
+        effective_window_minutes = (
+            window_seconds // 60 if window_seconds is not None else self.window_minutes
+        )
         
         rate_limit_key = f"{ip}:{endpoint}"
         now = datetime.now(timezone.utc)
-        window_start = now - timedelta(minutes=self.window_minutes)
-        
+        window_start = now - timedelta(minutes=effective_window_minutes)
+
         # Check if currently blocked (expedite rejections)
         doc = self.collection.find_one({"_id": rate_limit_key})
-        
+
         if doc and doc.get("blocked_until"):
             blocked_until = _ensure_aware_utc(doc["blocked_until"])
             if blocked_until and blocked_until > now:
-                # Currently blocked, reject immediately
                 return False
-        
+
         if doc and doc.get("first_attempt"):
             first_attempt = _ensure_aware_utc(doc["first_attempt"])
             if first_attempt and first_attempt > window_start:
-                # Within the rate limit window - check current attempt count
                 current_attempts = doc.get("attempts", 0)
-                
-                if current_attempts >= self.max_attempts:
-                    # Already at or exceeded limit, block for window_minutes
-                    blocked_until = now + timedelta(minutes=self.window_minutes)
+
+                if current_attempts >= effective_max:
+                    blocked_until = now + timedelta(minutes=effective_window_minutes)
                     self.collection.update_one(
                         {"_id": rate_limit_key},
                         {
