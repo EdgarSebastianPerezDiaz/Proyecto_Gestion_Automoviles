@@ -162,9 +162,9 @@ if cargo1_id:
         "hazardous": False, "requires_temperature_control": False,
         "requires_special_permit": False, "fragile": False,
     })
-    check("T6 Duplicate cargo type name → 409", r.status_code == 409, str(r.status_code))
+    check("T6 Duplicate cargo type name -> 409", r.status_code == 409, str(r.status_code))
 else:
-    check("T6 Duplicate cargo type name → 409", False, "no ID from T2")
+    check("T6 Duplicate cargo type name -> 409", False, "no ID from T2")
 
 # T7 — Update price
 if cargo1_id:
@@ -181,18 +181,18 @@ r = post(token, "/cargo-types", {
     "hazardous": False, "requires_temperature_control": False,
     "requires_special_permit": False, "fragile": False,
 })
-check("T8 Negative price_per_ton → 422", r.status_code == 422, str(r.status_code))
+check("T8 Negative price_per_ton -> 422", r.status_code == 422, str(r.status_code))
 
 # T9 — Get non-existent returns 404
 r = get(token, "/cargo-types/000000000000000000000000")
-check("T9 Non-existent cargo type → 404", r.status_code == 404, str(r.status_code))
+check("T9 Non-existent cargo type -> 404", r.status_code == 404, str(r.status_code))
 
 # T10 — Delete
 if cargo2_id:
     r = delete(token, f"/cargo-types/{cargo2_id}")
-    check("T10 Delete cargo type → 204", r.status_code == 204, str(r.status_code))
+    check("T10 Delete cargo type -> 204", r.status_code == 204, str(r.status_code))
 else:
-    check("T10 Delete cargo type → 204", False, "no ID from T3")
+    check("T10 Delete cargo type -> 204", False, "no ID from T3")
 
 # ─────────── 2. COMPANIES ────────────────────────────────────────────────────
 
@@ -241,7 +241,7 @@ else:
 r = get(token, "/companies")
 check("T5 List has at least 1 company", r.status_code == 200 and r.json().get("total", 0) >= 1)
 
-# T6 — Duplicate NIT → 409
+# T6 — Duplicate NIT -> 409
 if co1_id:
     r = post(token, "/companies", {
         "nit": nit1,
@@ -251,9 +251,9 @@ if co1_id:
         "phone": "1234567",
         "email": f"dup{rnd(4)}@test.com",
     })
-    check("T6 Duplicate NIT → 409", r.status_code == 409, str(r.status_code))
+    check("T6 Duplicate NIT -> 409", r.status_code == 409, str(r.status_code))
 else:
-    check("T6 Duplicate NIT → 409", False, "no ID from T2")
+    check("T6 Duplicate NIT -> 409", False, "no ID from T2")
 
 # T7 — Update company city
 if co1_id:
@@ -262,7 +262,7 @@ if co1_id:
 else:
     check("T7 Update company city", False, "no ID")
 
-# T8 — Invalid NIT format → 422
+# T8 — Invalid NIT format -> 422
 r = post(token, "/companies", {
     "nit": "123",
     "legal_name": "Invalid NIT Co",
@@ -271,18 +271,18 @@ r = post(token, "/companies", {
     "phone": "1234567",
     "email": f"inv{rnd(4)}@test.com",
 })
-check("T8 Invalid NIT → 422", r.status_code == 422, str(r.status_code))
+check("T8 Invalid NIT -> 422", r.status_code == 422, str(r.status_code))
 
 # T9 — 404 for unknown ID
 r = get(token, "/companies/000000000000000000000000")
-check("T9 Unknown company → 404", r.status_code == 404)
+check("T9 Unknown company -> 404", r.status_code == 404)
 
 # T10 — Delete company 2
 if co2_id:
     r = delete(token, f"/companies/{co2_id}")
-    check("T10 Delete company → 204", r.status_code == 204)
+    check("T10 Delete company -> 204", r.status_code == 204)
 else:
-    check("T10 Delete company → 204", False, "no ID from T3")
+    check("T10 Delete company -> 204", False, "no ID from T3")
 
 # ─────────── 3. CLIENTS ──────────────────────────────────────────────────────
 
@@ -331,7 +331,7 @@ r = post(token, "/clients", {
     "address": "Calle 1",
     "city": "Bogotá",
 })
-check("T6 Duplicate email → 409", r.status_code == 409, str(r.status_code))
+check("T6 Duplicate email -> 409", r.status_code == 409, str(r.status_code))
 
 # T7 — update city
 if cl1_id:
@@ -340,7 +340,7 @@ if cl1_id:
 else:
     check("T7 Update client city", False, "no ID")
 
-# T8 — short name → 422
+# T8 — short name -> 422
 r = post(token, "/clients", {
     "name": "A",
     "phone": "1234567",
@@ -348,16 +348,16 @@ r = post(token, "/clients", {
     "address": "Calle 1 # 1-1",
     "city": "Bogotá",
 })
-check("T8 Short name → 422", r.status_code == 422, str(r.status_code))
+check("T8 Short name -> 422", r.status_code == 422, str(r.status_code))
 
 r = get(token, "/clients/000000000000000000000000")
-check("T9 Unknown client → 404", r.status_code == 404)
+check("T9 Unknown client -> 404", r.status_code == 404)
 
 if cl2_id:
     r = delete(token, f"/clients/{cl2_id}")
-    check("T10 Delete client → 204", r.status_code == 204)
+    check("T10 Delete client -> 204", r.status_code == 204)
 else:
-    check("T10 Delete client → 204", False, "no ID")
+    check("T10 Delete client -> 204", False, "no ID")
 
 # ─────────── 4. FINAL RECIPIENTS ─────────────────────────────────────────────
 
@@ -411,23 +411,23 @@ if rec1_id:
 else:
     check("T7 Updated city persisted", False, "no ID")
 
-# T8 — invalid phone → 422
+# T8 — invalid phone -> 422
 r = post(token, "/final-recipients", {
     "name": "Nombre Valido",
     "phone": "NOPHONE",
     "address": "Calle 1 # 1-1",
     "city": "Bogotá",
 })
-check("T8 Invalid phone → 422", r.status_code == 422, str(r.status_code))
+check("T8 Invalid phone -> 422", r.status_code == 422, str(r.status_code))
 
 r = get(token, "/final-recipients/000000000000000000000000")
-check("T9 Unknown recipient → 404", r.status_code == 404)
+check("T9 Unknown recipient -> 404", r.status_code == 404)
 
 if rec2_id:
     r = delete(token, f"/final-recipients/{rec2_id}")
-    check("T10 Delete recipient → 204", r.status_code == 204)
+    check("T10 Delete recipient -> 204", r.status_code == 204)
 else:
-    check("T10 Delete recipient → 204", False, "no ID")
+    check("T10 Delete recipient -> 204", False, "no ID")
 
 # ─────────── 5. TRIP STATUSES ────────────────────────────────────────────────
 
@@ -464,7 +464,7 @@ else:
 r = get(token, "/trip-statuses")
 check("T5 List has created statuses", r.status_code == 200 and r.json().get("total", 0) >= 1)
 
-# T6 — duplicate name → 409
+# T6 — duplicate name -> 409
 if ts1_name:
     r = post(token, "/trip-statuses", {
         "name": ts1_name,
@@ -472,9 +472,9 @@ if ts1_name:
         "sequence_order": 5,
         "is_terminal": False,
     })
-    check("T6 Duplicate status name → 409", r.status_code == 409, str(r.status_code))
+    check("T6 Duplicate status name -> 409", r.status_code == 409, str(r.status_code))
 else:
-    check("T6 Duplicate status name → 409", False, "no name from T2")
+    check("T6 Duplicate status name -> 409", False, "no name from T2")
 
 # T7 — update description
 if ts1_id:
@@ -483,22 +483,22 @@ if ts1_id:
 else:
     check("T7 Update trip status description", False, "no ID")
 
-# T8 — invalid sequence_order (>100) → 422
+# T8 — invalid sequence_order (>100) -> 422
 r = post(token, "/trip-statuses", {
     "name": f"Invalido{rnd(4)}",
     "sequence_order": 200,
     "is_terminal": False,
 })
-check("T8 sequence_order > 100 → 422", r.status_code == 422, str(r.status_code))
+check("T8 sequence_order > 100 -> 422", r.status_code == 422, str(r.status_code))
 
 r = get(token, "/trip-statuses/000000000000000000000000")
-check("T9 Unknown trip status → 404", r.status_code == 404)
+check("T9 Unknown trip status -> 404", r.status_code == 404)
 
 if ts2_id:
     r = delete(token, f"/trip-statuses/{ts2_id}")
-    check("T10 Delete trip status → 204", r.status_code == 204)
+    check("T10 Delete trip status -> 204", r.status_code == 204)
 else:
-    check("T10 Delete trip status → 204", False, "no ID")
+    check("T10 Delete trip status -> 204", False, "no ID")
 
 # ─────────── 6. DRIVERS ──────────────────────────────────────────────────────
 
@@ -545,7 +545,7 @@ else:
 r = get(token, "/drivers")
 check("T5 List drivers has items", r.status_code == 200 and r.json().get("total", 0) >= 1)
 
-# T6 — duplicate ID number → 409
+# T6 — duplicate ID number -> 409
 r = post(token, "/drivers", {
     "id_number": dr_id_num1,
     "first_name": "Duplicado",
@@ -556,7 +556,7 @@ r = post(token, "/drivers", {
     "license_category": "C1",
     "license_expiry": future(365),
 })
-check("T6 Duplicate driver ID → 409", r.status_code == 409, str(r.status_code))
+check("T6 Duplicate driver ID -> 409", r.status_code == 409, str(r.status_code))
 
 # T7 — update phone
 if dr1_id:
@@ -565,7 +565,7 @@ if dr1_id:
 else:
     check("T7 Update driver phone", False, "no ID")
 
-# T8 — expired license → 422
+# T8 — expired license -> 422
 r = post(token, "/drivers", {
     "id_number": str(random.randint(10000000, 99999999)),
     "first_name": "Expirado",
@@ -576,16 +576,16 @@ r = post(token, "/drivers", {
     "license_category": "C1",
     "license_expiry": "2020-01-01T00:00:00Z",
 })
-check("T8 Expired license → 422", r.status_code == 422, str(r.status_code))
+check("T8 Expired license -> 422", r.status_code == 422, str(r.status_code))
 
 r = get(token, "/drivers/000000000000000000000000")
-check("T9 Unknown driver → 404", r.status_code == 404)
+check("T9 Unknown driver -> 404", r.status_code == 404)
 
 if dr2_id:
     r = delete(token, f"/drivers/{dr2_id}")
-    check("T10 Delete driver → 204", r.status_code == 204)
+    check("T10 Delete driver -> 204", r.status_code == 204)
 else:
-    check("T10 Delete driver → 204", False, "no ID")
+    check("T10 Delete driver -> 204", False, "no ID")
 
 # ─────────── 7. VEHICLES ─────────────────────────────────────────────────────
 
@@ -633,7 +633,7 @@ else:
 r = get(token, "/vehicles")
 check("T5 List vehicles has items", r.status_code == 200 and r.json().get("total", 0) >= 1)
 
-# T6 — duplicate plate → 409
+# T6 — duplicate plate -> 409
 r = post(token, "/vehicles", {
     "plate": plate1,
     "vehicle_type": "truck",
@@ -642,7 +642,7 @@ r = post(token, "/vehicles", {
     "capacity_tons": 10.0,
     "company_id": veh_co_id or "000000000000000000000001",
 })
-check("T6 Duplicate plate → 409", r.status_code == 409, str(r.status_code))
+check("T6 Duplicate plate -> 409", r.status_code == 409, str(r.status_code))
 
 # T7 — update capacity
 if veh1_id:
@@ -651,7 +651,7 @@ if veh1_id:
 else:
     check("T7 Update vehicle capacity", False, "no ID")
 
-# T8 — model_year too old → 422
+# T8 — model_year too old -> 422
 r = post(token, "/vehicles", {
     "plate": f"OLD{rnd(3).upper()}",
     "vehicle_type": "truck",
@@ -660,16 +660,16 @@ r = post(token, "/vehicles", {
     "capacity_tons": 5.0,
     "company_id": "000000000000000000000001",
 })
-check("T8 model_year < 1990 → 422", r.status_code == 422, str(r.status_code))
+check("T8 model_year < 1990 -> 422", r.status_code == 422, str(r.status_code))
 
 r = get(token, "/vehicles/000000000000000000000000")
-check("T9 Unknown vehicle → 404", r.status_code == 404)
+check("T9 Unknown vehicle -> 404", r.status_code == 404)
 
 if veh2_id:
     r = delete(token, f"/vehicles/{veh2_id}")
-    check("T10 Delete vehicle → 204", r.status_code == 204)
+    check("T10 Delete vehicle -> 204", r.status_code == 204)
 else:
-    check("T10 Delete vehicle → 204", False, "no ID")
+    check("T10 Delete vehicle -> 204", False, "no ID")
 
 # ─────────── 8. TRIPS ────────────────────────────────────────────────────────
 
@@ -726,7 +726,7 @@ else:
 r = get(token, "/trips")
 check("T5 List trips has items", r.status_code == 200 and r.json().get("total", 0) >= 1)
 
-# T6 — departure in past → 422
+# T6 — departure in past -> 422
 r = post(token, "/trips", {
     "origin": "Bogotá",
     "destination": "Cali",
@@ -739,7 +739,7 @@ r = post(token, "/trips", {
     "client_id": trip_client_id,
     "recipient_id": trip_recipient_id,
 })
-check("T6 Past departure_date → 422", r.status_code == 422, str(r.status_code))
+check("T6 Past departure_date -> 422", r.status_code == 422, str(r.status_code))
 
 # T7 — update trip status
 if trip1_id and ts1_id:
@@ -748,7 +748,7 @@ if trip1_id and ts1_id:
 else:
     check("T7 Update trip status", False, "missing IDs")
 
-# T8 — zero weight → 422
+# T8 — zero weight -> 422
 r = post(token, "/trips", {
     "origin": "Bogotá",
     "destination": "Cali",
@@ -761,16 +761,16 @@ r = post(token, "/trips", {
     "client_id": trip_client_id,
     "recipient_id": trip_recipient_id,
 })
-check("T8 weight_tons=0 → 422", r.status_code == 422, str(r.status_code))
+check("T8 weight_tons=0 -> 422", r.status_code == 422, str(r.status_code))
 
 r = get(token, "/trips/000000000000000000000000")
-check("T9 Unknown trip → 404", r.status_code == 404)
+check("T9 Unknown trip -> 404", r.status_code == 404)
 
 if trip2_id:
     r = delete(token, f"/trips/{trip2_id}")
-    check("T10 Delete trip → 204", r.status_code in (204, 200, 400), str(r.status_code))
+    check("T10 Delete trip -> 204", r.status_code in (204, 200, 400), str(r.status_code))
 else:
-    check("T10 Delete trip → 204", False, "no ID")
+    check("T10 Delete trip -> 204", False, "no ID")
 
 # ─────────── 9. INVOICES ─────────────────────────────────────────────────────
 
@@ -804,7 +804,7 @@ else:
 
 # T7 — 404 for unknown ID
 r = get(token, "/invoices/000000000000000000000000")
-check("T7 Unknown invoice → 404", r.status_code == 404)
+check("T7 Unknown invoice -> 404", r.status_code == 404)
 
 # T8 — Mark as paid if we have invoice
 if inv1_id:

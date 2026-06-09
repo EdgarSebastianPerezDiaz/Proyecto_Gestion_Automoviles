@@ -1,19 +1,17 @@
-"""Final recipients CRUD router."""
+"""Final recipients CRUD router — uses repository directly (service/schema field mismatch)."""
 from fastapi import APIRouter, HTTPException, Depends, Query
+from datetime import datetime, timezone
+from bson import ObjectId
 
 from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
 from src.repositories.final_recipient_repository import FinalRecipientRepository
-from src.services.final_recipient_service import (
-    FinalRecipientService, FinalRecipientAlreadyExistsError,
-    FinalRecipientNotFoundError, FinalRecipientValidationError
-)
 from src.schemas.final_recipient import FinalRecipientCreate, FinalRecipientUpdate
 
 router = APIRouter()
 
 
-def _svc(db) -> FinalRecipientService:
-    return FinalRecipientService(FinalRecipientRepository(db))
+def _repo(db) -> FinalRecipientRepository:
+    return FinalRecipientRepository(db)
 
 
 @router.get("", status_code=200)
@@ -23,8 +21,8 @@ async def list_recipients(
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    svc = _svc(db)
-    items = svc.list_recipients(skip=skip, limit=limit)
+    repo = _repo(db)
+    items = repo.find_active(skip=skip, limit=limit)
     return {"items": [serialize_doc(i) for i in items], "total": len(items), "skip": skip, "limit": limit}
 
 
@@ -34,14 +32,23 @@ async def create_recipient(
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    svc = _svc(db)
-    try:
-        item = svc.create_recipient(data.model_dump())
-        return serialize_doc(item)
-    except FinalRecipientAlreadyExistsError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except FinalRecipientValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    repo = _repo(db)
+    payload = data.model_dump()
+    # Check email uniqueness when provided
+    email = payload.get("email")
+    if email:
+        existing = repo.find_one({"email": email.lower(), "is_active": True})
+        if existing:
+            raise HTTPException(status_code=409, detail=f"Recipient with email {email} already exists")
+    doc = {
+        **payload,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+    }
+    inserted_id = repo.insert_one(doc)
+    doc["_id"] = inserted_id
+    return serialize_doc(doc)
 
 
 @router.get("/{recipient_id}", status_code=200)
@@ -50,12 +57,11 @@ async def get_recipient(
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    svc = _svc(db)
-    try:
-        item = svc.get_recipient(recipient_id)
-        return serialize_doc(item)
-    except FinalRecipientNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    repo = _repo(db)
+    item = repo.find_by_id(recipient_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"Recipient {recipient_id} not found")
+    return serialize_doc(item)
 
 
 @router.put("/{recipient_id}", status_code=200)
@@ -65,14 +71,13 @@ async def update_recipient(
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    svc = _svc(db)
-    try:
-        item = svc.update_recipient(recipient_id, data.model_dump(exclude_none=True))
-        return serialize_doc(item)
-    except FinalRecipientNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except FinalRecipientValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    repo = _repo(db)
+    if repo.find_by_id(recipient_id) is None:
+        raise HTTPException(status_code=404, detail=f"Recipient {recipient_id} not found")
+    update_fields = {k: v for k, v in data.model_dump(exclude_none=True).items()}
+    update_fields["updated_at"] = datetime.now(timezone.utc)
+    repo.update_one({"_id": ObjectId(recipient_id)}, {"$set": update_fields})
+    return serialize_doc(repo.find_by_id(recipient_id))
 
 
 @router.delete("/{recipient_id}", status_code=204)
@@ -81,8 +86,10 @@ async def delete_recipient(
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    svc = _svc(db)
-    try:
-        svc.delete_recipient(recipient_id)
-    except FinalRecipientNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    repo = _repo(db)
+    if repo.find_by_id(recipient_id) is None:
+        raise HTTPException(status_code=404, detail=f"Recipient {recipient_id} not found")
+    repo.update_one(
+        {"_id": ObjectId(recipient_id)},
+        {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
+    )

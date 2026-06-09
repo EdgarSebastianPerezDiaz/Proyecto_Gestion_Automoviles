@@ -35,7 +35,12 @@ async def create_cargo_type(
 ):
     svc = _svc(db)
     try:
-        item = svc.create_cargo_type(data.model_dump())
+        result = svc.create_cargo_type(data.model_dump())
+        # Service returns the inserted ID (str), not the full document
+        if isinstance(result, str):
+            item = svc.get_cargo_type(result)
+        else:
+            item = result
         return serialize_doc(item)
     except CargoTypeAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
