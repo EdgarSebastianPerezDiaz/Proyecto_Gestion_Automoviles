@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 from datetime import datetime, timezone
+import uuid
 
 from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
 from src.repositories.client_repository import ClientRepository
@@ -39,6 +40,8 @@ async def create_client(
     doc = {
         **data.model_dump(),
         "email": email,
+        # Generated NIT satisfies the unique index on clients.nit (schema has no nit field)
+        "nit": f"GEN{uuid.uuid4().hex[:9].upper()}",
         "is_active": True,
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),

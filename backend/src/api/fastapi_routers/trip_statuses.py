@@ -37,8 +37,14 @@ async def create_status(
     existing = repo.find_one({"name": data.name})
     if existing:
         raise HTTPException(status_code=409, detail=f"Trip status '{data.name}' already exists")
+    # Generate code from name — required by unique index on trip_statuses.code
+    code = data.name.lower().replace(" ", "_").replace("-", "_")
+    existing_code = repo.find_one({"code": code})
+    if existing_code:
+        raise HTTPException(status_code=409, detail=f"Trip status with code '{code}' already exists")
     doc = {
         "name": data.name,
+        "code": code,
         "description": data.description,
         "sequence_order": data.sequence_order,
         "is_terminal": data.is_terminal,

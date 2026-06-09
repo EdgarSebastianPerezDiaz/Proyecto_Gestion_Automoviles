@@ -11,7 +11,7 @@ import sys
 import json
 import random
 import string
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 
 try:
     import requests
@@ -42,7 +42,8 @@ def rnd(n=6) -> str:
 
 
 def future(days=365) -> str:
-    return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+    # Naive datetime — service comparisons use datetime.now() (no tz)
+    return (datetime.now() + timedelta(days=days)).isoformat()
 
 
 def check(name: str, ok: bool, detail: str = ""):

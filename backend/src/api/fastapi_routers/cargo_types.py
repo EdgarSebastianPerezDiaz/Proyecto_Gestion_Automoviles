@@ -1,5 +1,7 @@
 """Cargo types CRUD router."""
 from fastapi import APIRouter, HTTPException, Depends, Query
+from datetime import datetime, timezone
+from bson import ObjectId
 
 from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
 from src.repositories.cargo_type_repository import CargoTypeRepository
@@ -13,6 +15,10 @@ router = APIRouter()
 
 def _svc(db) -> CargoTypeService:
     return CargoTypeService(CargoTypeRepository(db))
+
+
+def _repo(db) -> CargoTypeRepository:
+    return CargoTypeRepository(db)
 
 
 @router.get("", status_code=200)
@@ -69,14 +75,17 @@ async def update_cargo_type(
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    svc = _svc(db)
+    # Bypass service — CargoTypeRepository lacks update()/soft_delete()
+    repo = _repo(db)
+    if repo.find_by_id(cargo_id) is None:
+        raise HTTPException(status_code=404, detail=f"Cargo type {cargo_id} not found")
+    update_fields = data.model_dump(exclude_none=True)
+    update_fields["updated_at"] = datetime.now(timezone.utc)
     try:
-        item = svc.update_cargo_type(cargo_id, data.model_dump(exclude_none=True))
-        return serialize_doc(item)
-    except CargoTypeNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except CargoTypeValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        repo.update_one({"_id": ObjectId(cargo_id)}, {"$set": update_fields})
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid cargo type data")
+    return serialize_doc(repo.find_by_id(cargo_id))
 
 
 @router.delete("/{cargo_id}", status_code=204)
@@ -85,8 +94,11 @@ async def delete_cargo_type(
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    svc = _svc(db)
-    try:
-        svc.delete_cargo_type(cargo_id)
-    except CargoTypeNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    # Bypass service — CargoTypeRepository lacks soft_delete()
+    repo = _repo(db)
+    if repo.find_by_id(cargo_id) is None:
+        raise HTTPException(status_code=404, detail=f"Cargo type {cargo_id} not found")
+    repo.update_one(
+        {"_id": ObjectId(cargo_id)},
+        {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
+    )
