@@ -268,6 +268,10 @@ from src.api.fastapi_routers.trip_statuses import router as trip_statuses_router
 # Set dependencies for auth router
 auth_module.set_dependencies(db_connection, rate_limiter)
 
+# Wire db_connection for all resource routers
+from src.api.fastapi_routers.dependencies import set_db
+set_db(db_connection)
+
 # Register routers
 app.include_router(health_router, prefix="/health", tags=["health"])
 app.include_router(auth_module.router, prefix="/auth", tags=["authentication"])
