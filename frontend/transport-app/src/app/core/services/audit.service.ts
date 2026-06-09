@@ -34,11 +34,13 @@ export class AuditService {
     page = 1,
     limit = 10,
     search = '',
+    actionFilter?: 'todos' | 'INSERT' | 'UPDATE' | 'DELETE',
     dateFrom?: Date,
     dateTo?: Date
   ): Observable<PaginatedResult<AuditOperation>> {
     const params: Record<string, string> = { page: String(page), limit: String(limit) };
     if (search.trim()) params['search'] = search.trim();
+    if (actionFilter && actionFilter !== 'todos') params['accion'] = actionFilter;
     if (dateFrom) params['dateFrom'] = dateFrom.toISOString();
     if (dateTo) params['dateTo'] = dateTo.toISOString();
 
@@ -51,6 +53,13 @@ export class AuditService {
         })),
         catchError(() => of({ items: [], total: 0 }))
       );
+  }
+
+  getAllOperationsForExport(
+    search = '',
+    actionFilter?: 'todos' | 'INSERT' | 'UPDATE' | 'DELETE'
+  ): Observable<AuditOperation[]> {
+    return this.getOperations(1, 10000, search, actionFilter).pipe(map(r => r.items));
   }
 
   getLogins(
@@ -74,6 +83,10 @@ export class AuditService {
         })),
         catchError(() => of({ items: [], total: 0 }))
       );
+  }
+
+  getAllLoginsForExport(search = ''): Observable<AuditLogin[]> {
+    return this.getLogins(1, 10000, search).pipe(map(r => r.items));
   }
 
   getRecentOperations(limit = 5): Observable<AuditOperation[]> {

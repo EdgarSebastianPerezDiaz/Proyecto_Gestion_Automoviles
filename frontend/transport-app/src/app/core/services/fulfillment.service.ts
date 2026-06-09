@@ -60,11 +60,11 @@ export class FulfillmentService {
     page = 1,
     limit = 10,
     search = '',
-    estadoPago?: FulfillmentPaymentStatus
+    estadoPago?: FulfillmentPaymentStatus | 'todos'
   ): Observable<PaginatedFulfillments> {
     const params: Record<string, string> = { page: String(page), limit: String(limit) };
     if (search.trim()) params['search'] = search.trim();
-    if (estadoPago) params['estadoPago'] = estadoPago;
+    if (estadoPago && estadoPago !== 'todos') params['estadoPago'] = estadoPago;
 
     return this.http
       .get<PaginatedFulfillments>(`${this.apiUrl}/invoices`, { params })
@@ -74,6 +74,20 @@ export class FulfillmentService {
           total: r.total || 0,
         })),
         catchError(() => of({ items: [], total: 0 }))
+      );
+  }
+
+  getFulfillmentsForReport(from: Date, to: Date): Observable<Fulfillment[]> {
+    const params: Record<string, string> = {
+      page: '1', limit: '10000',
+      dateFrom: from.toISOString(),
+      dateTo: to.toISOString(),
+    };
+    return this.http
+      .get<PaginatedFulfillments>(`${this.apiUrl}/invoices`, { params })
+      .pipe(
+        map(r => (r.items || []).map(i => this.mapItem(i))),
+        catchError(() => of([]))
       );
   }
 
