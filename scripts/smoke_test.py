@@ -138,12 +138,13 @@ def test_frontend(base: str):
         ok = r.status_code == 200 and "<!doctype html" in r.text.lower()
         check("GET /  →  200 + HTML Angular", ok, f"HTTP {r.status_code}")
 
-    # Rutas SPA (Angular) — S3 usa index.html como error-document → 200
+    # Rutas SPA (Angular) — S3 devuelve index.html con 200 o 404
+    # (error-document=index.html: el HTML se sirve aunque el status sea 404)
     for path in ["/login", "/admin", "/operator"]:
         r = _req("GET", base + path)
         if r is not None:
-            ok = r.status_code in (200,) and "<!doctype html" in r.text.lower()
-            check(f"GET {path}  →  SPA routing (index.html)", ok, f"HTTP {r.status_code}")
+            ok = r.status_code in (200, 404) and "<!doctype html" in r.text.lower()
+            check(f"GET {path}  →  SPA routing (HTML Angular)", ok, f"HTTP {r.status_code}")
 
     # Tiempo de respuesta
     t0 = time.monotonic()
@@ -439,7 +440,7 @@ def main():
         test_health(args.api)
 
         # Si no dieron credenciales, genera un usuario aleatorio (el registro puede fallar si no hay Atlas)
-        email = args.email or f"smoke_{uuid.uuid4().hex[:6]}@heavy-freight.test"
+        email = args.email or f"smoke{uuid.uuid4().hex[:6]}@example.com"
         token = test_auth(args.api, email, args.password)
 
         test_resources(args.api, token)
