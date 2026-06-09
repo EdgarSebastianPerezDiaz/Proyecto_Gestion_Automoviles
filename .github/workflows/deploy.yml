@@ -60,11 +60,11 @@ jobs:
           node-version: "20"
 
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: frontend/transport-app
         run: npm ci
 
       - name: Build Angular app
-        working-directory: frontend
+        working-directory: frontend/transport-app
         env:
           API_URL: "https://i7xihr7nhk.execute-api.us-east-1.amazonaws.com"
         run: npm run build -- --configuration production
@@ -78,7 +78,7 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          aws s3 sync frontend/dist/browser/ s3://${{ vars.S3_FRONTEND_BUCKET }} \
+          aws s3 sync frontend/transport-app/dist/transport-app/browser/ s3://${{ vars.S3_FRONTEND_BUCKET }} \
             --delete --acl public-read
 
       - name: Invalidate CloudFront cache
