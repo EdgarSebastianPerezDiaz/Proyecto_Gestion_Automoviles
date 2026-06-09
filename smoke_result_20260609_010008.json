@@ -1,0 +1,207 @@
+{
+  "timestamp": "20260609_010008",
+  "passed": 30,
+  "warned": 3,
+  "failed": 0,
+  "score_pct": 90,
+  "results": [
+    {
+      "label": "GET /health/live  →  200 + status OK",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · status=alive"
+    },
+    {
+      "label": "GET /health/ready  →  200 + status OK",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · status=ready"
+    },
+    {
+      "label": "GET /health/deep  →  200 + status OK",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · status=healthy"
+    },
+    {
+      "label": "GET /  →  200 + service name",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Heavy Freight Platform API"
+    },
+    {
+      "label": "POST /auth/register  →  201 o 409",
+      "ok": true,
+      "status": "WARN",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "POST /auth/login  (creds inválidas)  →  401",
+      "ok": true,
+      "status": "WARN",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "POST /auth/login  (creds válidas)  →  200 + JWT",
+      "ok": true,
+      "status": "WARN",
+      "note": "HTTP 500 — Atlas puede estar bloqueando la IP de Lambda"
+    },
+    {
+      "label": "  GET /companies",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  GET /clients",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  GET /drivers",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  GET /vehicles",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  GET /trips",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  GET /invoices",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  GET /cargo-types",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  GET /final-recipients",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  GET /trip-statuses",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · Not yet implemented"
+    },
+    {
+      "label": "  POST /companies",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  POST /clients",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  POST /drivers",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  POST /vehicles",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  POST /trips",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  POST /invoices",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  POST /cargo-types",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  POST /final-recipients",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  POST /trip-statuses",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  GET /companies/000000000000000000000001",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  GET /drivers/000000000000000000000001",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  GET /vehicles/000000000000000000000001",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  GET /trips/000000000000000000000001",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  DELETE /companies/000000000000000000000001",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "  DELETE /trips/000000000000000000000001",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 501"
+    },
+    {
+      "label": "OPTIONS /auth/login  →  CORS preflight OK",
+      "ok": true,
+      "status": "PASS",
+      "note": "HTTP 200 · ACAO=http://heavy-freight-frontend-prod.s3-website-us-east-1.amaz"
+    },
+    {
+      "label": "GET /health/live  con Origin  →  CORS header presente",
+      "ok": true,
+      "status": "PASS",
+      "note": "ACAO=http://heavy-freight-frontend-prod.s3-website-us-east-1.amaz"
+    }
+  ]
+}
