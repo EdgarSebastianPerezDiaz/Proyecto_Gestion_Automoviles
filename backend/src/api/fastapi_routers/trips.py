@@ -25,7 +25,9 @@ def _build_status_lookup(db) -> dict:
         result = {}
         for s in statuses:
             sid = str(s.get("_id", ""))
-            name = s.get("name") or _STATUS_EN_TO_ES.get(s.get("code", ""), s.get("code", ""))
+            code = s.get("code", "")
+            # Prefer Spanish translation for known English codes; fall back to DB name
+            name = _STATUS_EN_TO_ES.get(code) or s.get("name") or code
             if sid:
                 result[sid] = name
         return result

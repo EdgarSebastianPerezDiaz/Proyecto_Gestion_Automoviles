@@ -330,9 +330,10 @@ class DriverService:
         
         # If license_expiry changed, recalculate status
         if 'license_expiry' in update_data:
-            license_alert, license_expired = calculate_license_status(
-                update_data['license_expiry']
-            )
+            expiry = update_data['license_expiry']
+            if isinstance(expiry, str):
+                expiry = datetime.fromisoformat(expiry)
+            license_alert, license_expired = calculate_license_status(expiry)
             update_data['license_alert'] = license_alert
             update_data['license_expired'] = license_expired
         

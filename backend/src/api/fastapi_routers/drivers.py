@@ -80,6 +80,8 @@ async def update_driver(
         raise HTTPException(status_code=404, detail=str(e))
     except DriverValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.delete("/{driver_id}", status_code=204)
