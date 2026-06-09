@@ -246,3 +246,42 @@ jobs:
           if [ -n "$CLOUDFRONT_DIST_ID" ]; then
             echo "CloudFront invalidation triggered — wait ~1 min for propagation."
           fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 4 — Integration tests against the live Lambda deployment
+# ─────────────────────────────────────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests → Lambda
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    # Never block the pipeline — auth tests warn when Atlas is unreachable
+    continue-on-error: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install test dependencies
+        run: pip install requests
+
+      - name: Run integration tests
+        env:
+          API_URL: ${{ needs.deploy-backend.outputs.api_url }}
+        run: |
+          echo "Running integration tests against: $API_URL"
+          python backend/tests/integration/test_api.py
+
+      - name: Print API + frontend URLs on success
+        if: always()
+        env:
+          BUCKET: ${{ secrets.S3_FRONTEND_BUCKET }}
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Backend API : ${{ needs.deploy-backend.outputs.api_url }}"
+          echo "Frontend    : http://${BUCKET}.s3-website-${AWS_REGION}.amazonaws.com"
+          echo "Swagger UI  : ${{ needs.deploy-backend.outputs.api_url }}/docs"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

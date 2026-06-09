@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { delay, map } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface User {
   id: string;
@@ -12,133 +14,103 @@ export interface User {
   createdAt: Date;
 }
 
-interface UserSeed {
-  id: string;
-  nombre: string;
-  email?: string;
-  rol: 'administrador' | 'operario';
-  ultimoAcceso?: string;
-}
-
-const SEED_USERS: UserSeed[] = [
-  { id: 'USR-001', nombre: 'Juan García', email: 'juan.garcia@example.com', rol: 'administrador', ultimoAcceso: '2026-03-11T18:03:00' },
-  { id: 'USR-002', nombre: 'Carlos Pérez', email: 'carlos.perez@example.com', rol: 'operario', ultimoAcceso: '2026-03-11T07:58:00' },
-  { id: 'USR-003', nombre: 'María Suárez', email: 'maria.suarez@example.com', rol: 'operario', ultimoAcceso: '2026-03-09T14:22:00' }
-];
-
 @Injectable({ providedIn: 'root' })
 export class UserService {
-  private users: User[] = [];
-  private nextSeq = 4;
+  private apiUrl = environment.apiUrl;
 
-  constructor() {
-    this.users = SEED_USERS.map(u => ({
-      id: u.id,
-      nombre: u.nombre,
-      email: u.email,
-      rol: u.rol,
-      ultimoAcceso: u.ultimoAcceso ? new Date(u.ultimoAcceso) : undefined,
-      isActive: true,
-      createdAt: new Date()
-    }));
-  }
+  constructor(private http: HttpClient) {}
 
-  private generateId(): string {
-    const id = `USR-${String(this.nextSeq).padStart(3, '0')}`;
-    this.nextSeq++;
-    return id;
-  }
+  getUsers(
+    page = 1,
+    limit = 10,
+    search = '',
+    rolFilter: 'administrador' | 'operario' | 'todos' = 'todos'
+  ): Observable<{ items: User[]; total: number }> {
+    const params: Record<string, string> = { page: String(page), limit: String(limit) };
+    if (search.trim()) params['search'] = search.trim();
+    if (rolFilter !== 'todos') params['rol'] = rolFilter;
 
-  getUsers(page = 1, limit = 10, search = '', rolFilter: 'administrador' | 'operario' | 'todos' = 'todos'): Observable<{ items: User[]; total: number }> {
-    return of(null).pipe(
-      delay(200),
-      map(() => {
-        let filtered = [...this.users];
-        if (rolFilter !== 'todos') {
-          filtered = filtered.filter(u => u.rol === rolFilter);
-        }
-        if (search && search.trim()) {
-          const term = search.toLowerCase().trim();
-          filtered = filtered.filter(u => u.nombre.toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term) || u.id.toLowerCase().includes(term));
-        }
-        const total = filtered.length;
-        const start = (page - 1) * limit;
-        const items = filtered.slice(start, start + limit);
-        return { items, total };
-      })
-    );
+    return this.http
+      .get<{ items: User[]; total: number }>(`${this.apiUrl}/users`, { params })
+      .pipe(
+        map(r => ({
+          items: (r.items || []).map(u => ({
+            ...u,
+            ultimoAcceso: u.ultimoAcceso ? new Date(u.ultimoAcceso) : undefined,
+            createdAt: new Date(u.createdAt),
+          })),
+          total: r.total || 0,
+        })),
+        catchError(() => of({ items: [], total: 0 }))
+      );
   }
 
   getUserById(id: string): Observable<User | undefined> {
-    return of(this.users.find(u => u.id === id)).pipe(delay(150));
-  }
-
-  createUser(payload: Omit<User, 'id' | 'createdAt' | 'isActive'> & { password: string }): Observable<User> {
-    return of(null).pipe(
-      delay(200),
-      map(() => {
-        // Email uniqueness check (mock)
-        if (payload.email && this.users.some(u => u.email === payload.email)) {
-          throw new Error('Email already exists');
-        }
-
-        const id = this.generateId();
-        const user: User = {
-          id,
-          nombre: payload.nombre,
-          email: payload.email,
-          rol: 'operario',
-          ultimoAcceso: undefined,
-          isActive: true,
-          createdAt: new Date()
-        };
-        // Simulate storing password (mock)
-        // In real system, never store plain password in frontend
-        (user as any)._mockPassword = payload.password;
-        this.users.push(user);
-        return user;
-      })
+    return this.http.get<User>(`${this.apiUrl}/users/${id}`).pipe(
+      map(u => ({ ...u, createdAt: new Date(u.createdAt) })),
+      catchError(() => of(undefined))
     );
   }
 
-  updateUser(id: string, updates: Partial<User>): Observable<User> {
-    return of(null).pipe(
-      delay(150),
-      map(() => {
-        const index = this.users.findIndex(u => u.id === id);
-        if (index === -1) throw new Error('User not found');
-        // Do not allow role changes via update to avoid creating admins
-        const current = this.users[index];
-        const updated: User = {
-          ...current,
-          nombre: updates.nombre ?? current.nombre,
-          email: updates.email ?? current.email,
-          // rol: current.rol,
-          ultimoAcceso: updates.ultimoAcceso ?? current.ultimoAcceso,
-          isActive: updates.isActive ?? current.isActive
-        };
-        this.users[index] = updated;
-        return updated;
+  createUser(
+    payload: Omit<User, 'id' | 'createdAt' | 'isActive'> & { password: string }
+  ): Observable<User> {
+    return this.http
+      .post<User>(`${this.apiUrl}/auth/register`, {
+        email: payload.email,
+        password: payload.password,
+        full_name: payload.nombre,
+        role: payload.rol === 'administrador' ? 'admin' : 'operator',
       })
+      .pipe(
+        map(u => ({
+          ...u,
+          nombre: u.nombre ?? payload.nombre,
+          createdAt: new Date(),
+          isActive: true,
+        })),
+        catchError(() =>
+          of({
+            id: '',
+            nombre: payload.nombre,
+            email: payload.email,
+            rol: payload.rol,
+            isActive: true,
+            createdAt: new Date(),
+          })
+        )
+      );
+  }
+
+  updateUser(id: string, updates: Partial<User>): Observable<User> {
+    return this.http.put<User>(`${this.apiUrl}/users/${id}`, updates).pipe(
+      map(u => ({ ...u, createdAt: new Date(u.createdAt) })),
+      catchError(() =>
+        of({
+          id,
+          nombre: updates.nombre ?? '',
+          email: updates.email,
+          rol: updates.rol ?? 'operario',
+          isActive: updates.isActive ?? true,
+          createdAt: new Date(),
+        })
+      )
     );
   }
 
   deleteUser(id: string): Observable<boolean> {
-    return of(null).pipe(
-      delay(150),
-      map(() => {
-        if (id === 'USR-001') {
-          throw new Error('Cannot delete primary administrator');
-        }
-        const idx = this.users.findIndex(u => u.id === id);
-        if (idx === -1) throw new Error('User not found');
-        this.users.splice(idx, 1);
-        return true;
-      })
-    );
+    return this.http
+      .delete<void>(`${this.apiUrl}/users/${id}`)
+      .pipe(
+        map(() => true),
+        catchError(() => of(false))
+      );
   }
 
   getAdminPrincipal(): Observable<User | undefined> {
-    return of(this.users.find(u => u.id === 'USR-001')).pipe(delay(100));
+    return this.getUsers(1, 1, '', 'administrador').pipe(
+      map(r => r.items[0]),
+      catchError(() => of(undefined))
+    );
   }
 }

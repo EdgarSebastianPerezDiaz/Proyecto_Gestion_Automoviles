@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { delay } from 'rxjs/operators';
+import { HttpClient } from '@angular/common/http';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface KPI {
   label: string;
@@ -28,148 +30,98 @@ export interface OperatorDashboardData {
   alerts: Alert[];
 }
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class DashboardService {
+  private apiUrl = environment.apiUrl;
 
-  constructor() { }
+  constructor(private http: HttpClient) {}
 
-  /**
-   * Get admin dashboard data with KPIs and alerts
-   */
   getAdminDashboard(): Observable<AdminDashboardData> {
-    const mockData: AdminDashboardData = {
-      kpis: [
-        {
-          label: 'Viajes Activos',
-          value: 8,
-          icon: '🚚',
-          color: 'gold'
-        },
-        {
-          label: 'Viajes Completados',
-          value: 47,
-          icon: '✅',
-          color: 'green'
-        },
-        {
-          label: 'Ingresos del Mes',
-          value: '$48.2M',
-          unit: 'COP',
-          icon: '💰',
-          color: 'green'
-        },
-        {
-          label: 'Cumplidos Pendientes',
-          value: 5,
-          icon: '📋',
-          color: 'red'
-        },
-        {
-          label: 'Docs. por Vencer',
-          value: 3,
-          icon: '⚠️',
-          color: 'orange'
-        },
-        {
-          label: 'Vehículos Disponibles',
-          value: '12 / 20',
-          icon: '🚙',
-          color: 'blue'
-        }
-      ],
-      alerts: [
-        {
-          id: '1',
-          severity: 'error',
-          message: 'Licencia de Sebastián Torres vence en 12 días',
-          link: '/admin/drivers',
-          timestamp: new Date()
-        },
-        {
-          id: '2',
-          severity: 'warning',
-          message: 'SOAT de vehículo ABC456 vence en 25 días',
-          link: '/admin/vehicles',
-          timestamp: new Date(Date.now() - 3600000)
-        },
-        {
-          id: '3',
-          severity: 'warning',
-          message: '5 cumplidos pendientes de pago — revisar cartera',
-          link: '/admin/invoices',
-          timestamp: new Date(Date.now() - 7200000)
-        },
-        {
-          id: '4',
-          severity: 'info',
-          message: '8 vehículos disponibles para asignación inmediata',
-          link: '/admin/vehicles',
-          timestamp: new Date(Date.now() - 86400000)
-        }
-      ]
-    };
+    return forkJoin({
+      trips: this.http
+        .get<{ items: any[]; total: number }>(`${this.apiUrl}/trips`, {
+          params: { page: '1', limit: '1000' },
+        })
+        .pipe(catchError(() => of({ items: [], total: 0 }))),
+      vehicles: this.http
+        .get<{ items: any[]; total: number }>(`${this.apiUrl}/vehicles`, {
+          params: { page: '1', limit: '1000' },
+        })
+        .pipe(catchError(() => of({ items: [], total: 0 }))),
+      drivers: this.http
+        .get<{ items: any[]; total: number }>(`${this.apiUrl}/drivers`, {
+          params: { page: '1', limit: '1000' },
+        })
+        .pipe(catchError(() => of({ items: [], total: 0 }))),
+      invoices: this.http
+        .get<{ items: any[]; total: number }>(`${this.apiUrl}/invoices`, {
+          params: { page: '1', limit: '1000' },
+        })
+        .pipe(catchError(() => of({ items: [], total: 0 }))),
+    }).pipe(
+      map(({ trips, vehicles, drivers, invoices }) => {
+        const allTrips = trips.items || [];
+        const allVehicles = vehicles.items || [];
+        const allDrivers = drivers.items || [];
+        const allInvoices = invoices.items || [];
 
-    return of(mockData);
+        const activeTrips = allTrips.filter((t: any) => t.estado === 'En Ruta').length;
+        const completedTrips = allTrips.filter((t: any) => t.estado === 'Entregado').length;
+        const availableVehicles = allVehicles.filter((v: any) => v.estado === 'Disponible').length;
+        const pendingInvoices = allInvoices.filter((i: any) => i.estado === 'Pendiente').length;
+        const today = new Date();
+        const in30days = new Date(today.getTime() + 30 * 86400000);
+        const expiringDrivers = allDrivers.filter((d: any) => {
+          const exp = d.license_expiry ? new Date(d.license_expiry) : null;
+          return exp && exp > today && exp < in30days;
+        }).length;
+
+        const kpis: KPI[] = [
+          { label: 'Viajes Activos', value: activeTrips, icon: '🚚', color: 'gold' },
+          { label: 'Viajes Completados', value: completedTrips, icon: '✅', color: 'green' },
+          { label: 'Cumplidos Pendientes', value: pendingInvoices, icon: '📋', color: 'red' },
+          { label: 'Docs. por Vencer', value: expiringDrivers, icon: '⚠️', color: 'orange' },
+          {
+            label: 'Vehículos Disponibles',
+            value: `${availableVehicles} / ${allVehicles.length}`,
+            icon: '🚙',
+            color: 'blue',
+          },
+        ];
+
+        const alerts: Alert[] = [];
+        if (expiringDrivers > 0) {
+          alerts.push({
+            id: 'drv-exp',
+            severity: 'warning',
+            message: `${expiringDrivers} licencia(s) de conductor por vencer en 30 días`,
+            link: '/admin/drivers',
+            timestamp: new Date(),
+          });
+        }
+        if (pendingInvoices > 0) {
+          alerts.push({
+            id: 'inv-pending',
+            severity: 'info',
+            message: `${pendingInvoices} cumplidos pendientes de pago`,
+            link: '/admin/invoices',
+            timestamp: new Date(),
+          });
+        }
+
+        return { kpis, alerts };
+      })
+    );
   }
 
-  /**
-   * Get operator dashboard data
-   */
   getOperatorDashboard(): Observable<OperatorDashboardData> {
-    const mockData: OperatorDashboardData = {
-      kpis: [
-        {
-          label: 'Viajes Activos Hoy',
-          value: 8,
-          icon: '🚚',
-          color: 'gold'
-        },
-        {
-          label: 'Cumplidos por Registrar',
-          value: 3,
-          icon: '📋',
-          color: 'red'
-        },
-        {
-          label: 'Alertas de Documentos',
-          value: 3,
-          icon: '⚠️',
-          color: 'orange'
-        },
-        {
-          label: 'Vehículos Disponibles',
-          value: '12 / 20',
-          icon: '🚙',
-          color: 'blue'
-        }
-      ],
-      alerts: [
-        {
-          id: '1',
-          severity: 'error',
-          message: 'VJ-003 fue entregado — registrar cumplido pendiente',
-          link: '/operator/fulfillments',
-          timestamp: new Date()
-        },
-        {
-          id: '2',
-          severity: 'warning',
-          message: 'Licencia de Sebastián Torres vence en 12 días — verificar renovación',
-          link: '/operator/drivers',
-          timestamp: new Date(Date.now() - 3600000)
-        },
-        {
-          id: '3',
-          severity: 'warning',
-          message: 'SOAT de vehículo ABC456 vence en 25 días — notificar al propietario',
-          link: '/operator/vehicles',
-          timestamp: new Date(Date.now() - 7200000)
-        }
-      ]
-    };
-
-    return of(mockData).pipe(delay(300));
+    return this.getAdminDashboard().pipe(
+      map(data => ({
+        kpis: data.kpis.filter(k =>
+          ['Viajes Activos', 'Cumplidos Pendientes', 'Docs. por Vencer', 'Vehículos Disponibles'].includes(k.label)
+        ),
+        alerts: data.alerts,
+      }))
+    );
   }
 }

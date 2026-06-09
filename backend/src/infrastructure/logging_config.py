@@ -102,16 +102,15 @@ class JSONFormatter(logging.Formatter):
             "line": record.lineno,
         }
         
-        # Include correlation_id if available in Flask context
+        # Include correlation_id if available in Flask context (optional dependency)
         try:
             from flask import g, has_request_context
             if has_request_context() and hasattr(g, 'correlation_id'):
                 log_data["correlation_id"] = g.correlation_id
             else:
-                # Outside request context (e.g., app startup)
                 log_data["correlation_id"] = None
-        except RuntimeError:
-            # Called outside Flask app context
+        except (RuntimeError, ImportError, ModuleNotFoundError):
+            # Flask not installed (Lambda/FastAPI env) or outside request context
             log_data["correlation_id"] = None
         
         # Include exception info if present
