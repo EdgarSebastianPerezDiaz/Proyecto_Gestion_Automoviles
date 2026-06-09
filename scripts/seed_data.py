@@ -1,316 +1,300 @@
 """
-Heavy Freight Platform — Seed Script
-Carga 10 registros de ejemplo en cada módulo usando la API en vivo.
-Los datos ya existentes no se duplican (el script es idempotente por email/nit/nombre).
-
-Uso:
-    python scripts/seed_data.py --api https://i7xihr7nhk.execute-api.us-east-1.amazonaws.com
+Poblar el sistema con datos simulados realistas para que el dashboard se vea completo.
+Crea empresas, clientes, conductores, vehiculos, tipos de carga, destinatarios y viajes
+con distintos estados.
 """
-import argparse
-import sys
-import random
-import string
-from datetime import datetime, timedelta
+import sys, io, requests, random, time
+from datetime import datetime, timedelta, timezone
 
-try:
-    import requests
-except ImportError:
-    print("ERROR: pip install requests")
-    sys.exit(1)
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--api", required=True)
-parser.add_argument("--email", default="admin@heavy-freight.com")
-parser.add_argument("--password", default="Admin123!")
-args = parser.parse_args()
+API = "https://i7xihr7nhk.execute-api.us-east-1.amazonaws.com"
 
-API = args.api.rstrip("/")
+# ── helpers ───────────────────────────────────────────────────────────────────
+def sep(t):  print(f"\n{'='*60}\n  {t}\n{'='*60}")
+def ok(m):   print(f"  [OK]   {m}")
+def err(m):  print(f"  [ERR]  {m}")
+def inf(m):  print(f"         {m}")
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+def post(path, body):
+    r = requests.post(f"{API}{path}", headers=H, json=body, timeout=20)
+    return r
 
-def uid(n=6):
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=n))
+def patch_status(trip_id, code):
+    r = requests.patch(f"{API}/trips/{trip_id}/status", headers=H,
+                       json={"status_code": code}, timeout=20)
+    return r
 
-def future(days):
-    # Naive — for driver/vehicle fields (service uses datetime.now() naive)
-    return (datetime.now() + timedelta(days=days)).isoformat()
-
-def future_utc(days):
-    # Timezone-aware — for trip dates (schema validates against datetime.now(utc))
-    from datetime import timezone
-    return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
-
-def get_token():
-    r = requests.post(f"{API}/auth/login",
-                      json={"email": args.email, "password": args.password}, timeout=15)
-    if r.status_code == 200:
-        return r.json()["access_token"]
-    requests.post(f"{API}/auth/register",
-                  json={"email": args.email, "password": args.password, "full_name": "Admin Seed"},
+# ── LOGIN ─────────────────────────────────────────────────────────────────────
+sep("LOGIN")
+r = requests.post(f"{API}/auth/login",
+                  json={"email": "admin@heavy-freight.com", "password": "Admin123!"},
                   timeout=15)
-    r = requests.post(f"{API}/auth/login",
-                      json={"email": args.email, "password": args.password}, timeout=15)
-    if r.status_code == 200:
-        return r.json()["access_token"]
-    print(f"FATAL: no se pudo obtener token ({r.status_code})")
+if r.status_code != 200:
+    err(f"Login fallido {r.status_code}: {r.text}")
     sys.exit(1)
+tok = r.json()["access_token"]
+H = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+ok("Login exitoso")
 
-def H(tok):
-    return {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
-
-def count(tok, path):
-    r = requests.get(f"{API}/{path.lstrip('/')}", headers=H(tok), timeout=15)
-    if r.status_code == 200:
-        return r.json().get("total", 0)
-    return 0
-
-def post(tok, path, body):
-    r = requests.post(f"{API}/{path.lstrip('/')}", headers=H(tok), json=body, timeout=15)
-    if r.status_code == 201:
-        return r.json()
-    return None
-
-def section(title):
-    print(f"\n{'-'*55}")
-    print(f"  {title}")
-    print(f"{'-'*55}")
-
-# ── Login ─────────────────────────────────────────────────────────────────────
-
-print("\nHeavy Freight Platform — Seed de datos de ejemplo")
-print(f"API: {API}")
-tok = get_token()
-print("  Token obtenido OK")
-
-# ── 1. CARGO TYPES ────────────────────────────────────────────────────────────
-
-section("CARGO TYPES")
-existing = count(tok, "/cargo-types")
-print(f"  Existentes: {existing}")
-cargo_types = [
-    {"name": "Carga General", "description": "Mercancía no peligrosa de uso general", "price_per_ton": 95.0, "hazardous": False, "requires_temperature_control": False, "requires_special_permit": False, "fragile": False},
-    {"name": "Carga Peligrosa", "description": "Materiales inflamables o tóxicos", "price_per_ton": 280.0, "hazardous": True, "requires_temperature_control": False, "requires_special_permit": True, "fragile": False},
-    {"name": "Carga Refrigerada", "description": "Alimentos y medicamentos con cadena de frío", "price_per_ton": 320.0, "hazardous": False, "requires_temperature_control": True, "requires_special_permit": False, "fragile": False},
-    {"name": "Carga Frágil", "description": "Vidrio, cerámica, electrónica delicada", "price_per_ton": 150.0, "hazardous": False, "requires_temperature_control": False, "requires_special_permit": False, "fragile": True},
-    {"name": "Carga Líquida", "description": "Aceites, combustibles en tanques", "price_per_ton": 210.0, "hazardous": True, "requires_temperature_control": False, "requires_special_permit": True, "fragile": False},
-    {"name": "Carga Pesada", "description": "Maquinaria industrial y equipos de construcción", "price_per_ton": 180.0, "hazardous": False, "requires_temperature_control": False, "requires_special_permit": True, "fragile": False},
-    {"name": "Carga Perecedera", "description": "Frutas, verduras y productos frescos", "price_per_ton": 200.0, "hazardous": False, "requires_temperature_control": True, "requires_special_permit": False, "fragile": True},
-    {"name": "Carga Voluminosa", "description": "Muebles y electrodomésticos grandes", "price_per_ton": 130.0, "hazardous": False, "requires_temperature_control": False, "requires_special_permit": False, "fragile": True},
-    {"name": "Carga Química", "description": "Productos químicos industriales", "price_per_ton": 350.0, "hazardous": True, "requires_temperature_control": False, "requires_special_permit": True, "fragile": False},
-    {"name": "Carga Farmacéutica", "description": "Medicamentos y materiales hospitalarios", "price_per_ton": 400.0, "hazardous": False, "requires_temperature_control": True, "requires_special_permit": True, "fragile": True},
-]
-cargo_ids = []
-created = 0
-for ct in cargo_types:
-    result = post(tok, "/cargo-types", ct)
-    if result:
-        cargo_ids.append(result["id"])
-        created += 1
-print(f"  Creados: {created} | Total ahora: {count(tok, '/cargo-types')}")
-
-# ── 2. COMPANIES ──────────────────────────────────────────────────────────────
-
-section("COMPANIES")
-existing = count(tok, "/companies")
-print(f"  Existentes: {existing}")
-companies_data = [
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Transportes Colombia S.A.S", "trade_name": "TransCol", "address": "Calle 50 # 10-20", "city": "Bogotá", "phone": "+57 1 2345678", "email": f"info{uid(3)}@transcol.com", "contact_name": "Carlos Mendoza"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Logística Andina Ltda", "trade_name": "LogiAndina", "address": "Av. El Dorado 93-11", "city": "Medellín", "phone": "+57 4 8765432", "email": f"ops{uid(3)}@logiandina.com", "contact_name": "Ana Restrepo"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Flota Pacífico S.A", "trade_name": "FP Express", "address": "Carrera 80 # 40-10", "city": "Cali", "phone": "+57 2 3334455", "email": f"flota{uid(3)}@fpexpress.com", "contact_name": "Jorge Castaño"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Distribuciones Caribe S.A.S", "trade_name": "DistriCaribe", "address": "Calle 85 # 50-30", "city": "Barranquilla", "phone": "+57 5 6667788", "email": f"dist{uid(3)}@districaribe.com", "contact_name": "María Torres"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Transportes del Sur Ltda", "trade_name": "TransSur", "address": "Carrera 10 # 5-20", "city": "Bucaramanga", "phone": "+57 7 9998877", "email": f"sur{uid(3)}@transsur.com", "contact_name": "Luis García"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Carga Rápida S.A.S", "trade_name": "CargoRápido", "address": "Av. Principal # 15-40", "city": "Pereira", "phone": "+57 6 1112233", "email": f"cargo{uid(3)}@cargorapido.com", "contact_name": "Sandra Ríos"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Pesados del Norte Ltda", "trade_name": "PesaNorte", "address": "Calle 20 # 8-15", "city": "Cartagena", "phone": "+57 5 4445566", "email": f"norte{uid(3)}@pesanorte.com", "contact_name": "Roberto Díaz"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Furgones Express S.A", "trade_name": "FurgoEx", "address": "Carrera 40 # 60-20", "city": "Manizales", "phone": "+57 6 7778899", "email": f"furgo{uid(3)}@furgoex.com", "contact_name": "Patricia Mora"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Macroflota Colombia S.A.S", "trade_name": "MacroFlota", "address": "Av. Circunvalar # 30-50", "city": "Armenia", "phone": "+57 6 2223344", "email": f"macro{uid(3)}@macroflota.com", "contact_name": "Andrés López"},
-    {"nit": f"{random.randint(100000000,999999999)}0", "legal_name": "Internacional de Carga Ltda", "trade_name": "InternaCarga", "address": "Calle 100 # 25-60", "city": "Ibagué", "phone": "+57 8 5556677", "email": f"inter{uid(3)}@internacarga.com", "contact_name": "Claudia Vargas"},
+# ── 1. EMPRESAS ───────────────────────────────────────────────────────────────
+sep("EMPRESAS")
+empresas_data = [
+    {"nombre": "Logistica Andina S.A.S",        "nit": "800.123.456-7", "direccion": "Cra 15 #93-47, Bogota",          "telefono": "6013456789", "correo": "contacto@logisticaandina.com"},
+    {"nombre": "Transportes del Pacifico Ltda",  "nit": "900.234.567-8", "direccion": "Av 3N #12-45, Cali",             "telefono": "6024567890", "correo": "info@transppacifico.com"},
+    {"nombre": "Flota del Caribe S.A",           "nit": "890.345.678-9", "direccion": "Calle 72 #50-21, Barranquilla",  "telefono": "6056789012", "correo": "operaciones@flotacaribe.com"},
+    {"nombre": "Alianza Transportadora Ltda",    "nit": "860.456.789-0", "direccion": "Cra 49 #54-23, Medellin",        "telefono": "6044321098", "correo": "admin@alianzatrans.com"},
+    {"nombre": "Carga Segura Colombia S.A.S",    "nit": "901.567.890-1", "direccion": "Av Americas #24-56, Bogota",     "telefono": "6013219876", "correo": "ventas@cargasegura.com"},
 ]
 company_ids = []
-created = 0
-for co in companies_data:
-    result = post(tok, "/companies", co)
-    if result:
-        company_ids.append(result["id"])
-        created += 1
-print(f"  Creados: {created} | Total ahora: {count(tok, '/companies')}")
+for e in empresas_data:
+    r = post("/companies", e)
+    if r.status_code == 201:
+        cid = r.json()["id"]
+        company_ids.append(cid)
+        ok(f"Empresa '{e['nombre']}' -> id={cid[:8]}")
+    elif r.status_code == 409:
+        inf(f"Empresa '{e['nombre']}' ya existe (409) — buscando id...")
+        existing = requests.get(f"{API}/companies", headers=H, timeout=15).json().get("items", [])
+        for ex in existing:
+            if ex.get("nit") == e["nit"] or ex.get("nombre") == e["nombre"]:
+                company_ids.append(ex["id"])
+                inf(f"  id={ex['id'][:8]} (reutilizado)")
+                break
+    else:
+        err(f"Empresa '{e['nombre']}': {r.status_code} {r.text[:80]}")
 
-# ── 3. CLIENTS ────────────────────────────────────────────────────────────────
-
-section("CLIENTS")
-existing = count(tok, "/clients")
-print(f"  Existentes: {existing}")
-clients_data = [
-    {"name": "Almacenes Todo Hogar S.A.S", "phone": "+57 300 1112233", "email": f"compras{uid(4)}@todoholgar.com", "address": "Calle 72 # 10-55", "city": "Bogotá", "contact_person": "Felipe Guerrero"},
-    {"name": "Industrias Plásticas Ltda", "phone": "+57 311 4445566", "email": f"logist{uid(4)}@indplasticas.com", "address": "Av. 30 # 40-20", "city": "Medellín", "contact_person": "Camila Vásquez"},
-    {"name": "Supermercados La Canasta S.A", "phone": "+57 320 7778899", "email": f"pedidos{uid(4)}@lacanasta.com", "address": "Carrera 15 # 80-10", "city": "Cali", "contact_person": "Hernán Bedoya"},
-    {"name": "Exportaciones Café Verde Ltda", "phone": "+57 315 2223344", "email": f"expo{uid(4)}@cafeverde.com", "address": "Calle 35 # 7-90", "city": "Manizales", "contact_person": "Isabella Martínez"},
-    {"name": "Construcciones Torres S.A.S", "phone": "+57 321 5556677", "email": f"obras{uid(4)}@contorres.com", "address": "Av. El Poblado # 12-45", "city": "Medellín", "contact_person": "Sebastián Arias"},
-    {"name": "Distribuidora El Maizal Ltda", "phone": "+57 312 8889900", "email": f"ventas{uid(4)}@elmaizal.com", "address": "Carrera 8 # 22-40", "city": "Barranquilla", "contact_person": "Valeria Ochoa"},
-    {"name": "Farmacéutica NaturVida S.A", "phone": "+57 322 1112233", "email": f"supply{uid(4)}@naturvida.com", "address": "Calle 53 # 30-15", "city": "Bogotá", "contact_person": "Diego Salcedo"},
-    {"name": "Muebles y Estilos S.A.S", "phone": "+57 318 4445566", "email": f"despacho{uid(4)}@muestilos.com", "address": "Av. Las Américas # 68-75", "city": "Cali", "contact_person": "Laura Jiménez"},
-    {"name": "Agroexportaciones Llanos Ltda", "phone": "+57 317 7778899", "email": f"agro{uid(4)}@llanosx.com", "address": "Carrera 25 # 18-30", "city": "Villavicencio", "contact_person": "Julián Rojas"},
-    {"name": "Tecnopartes Industriales S.A.S", "phone": "+57 319 2223344", "email": f"compras{uid(4)}@tecnopartes.com", "address": "Zona Industrial # 5-100", "city": "Bogotá", "contact_person": "Natalia Cruz"},
+# ── 2. CLIENTES (transportistas) ───────────────────────────────────────────────
+sep("CLIENTES")
+clientes_data = [
+    {"nombre": "Almacenes Exito S.A",      "nit": "860.007.538-1", "direccion": "Calle 80 #70-60, Bogota",       "telefono": "6013001234", "correo": "logistica@exito.com",          "tipoDocumento": "NIT"},
+    {"nombre": "Postobon S.A.S",           "nit": "860.002.525-5", "direccion": "Av El Dorado #90-10, Bogota",   "telefono": "6012991000", "correo": "compras@postobon.com",          "tipoDocumento": "NIT"},
+    {"nombre": "Bavaria S.A",              "nit": "860.034.313-7", "direccion": "Cra 53A #127-35, Bogota",       "telefono": "6016600000", "correo": "supply@bavaria.com.co",         "tipoDocumento": "NIT"},
+    {"nombre": "Grupo Familia S.A.S",      "nit": "890.300.513-2", "direccion": "Cra 43A #7-50, Medellin",      "telefono": "6044441100", "correo": "compras@grupofamilia.com",       "tipoDocumento": "NIT"},
+    {"nombre": "Corona S.A",               "nit": "860.007.382-3", "direccion": "Autopista Norte #131-80, Bogota","telefono": "6017456789", "correo": "logistica@corona.com.co",       "tipoDocumento": "NIT"},
+    {"nombre": "Colombina S.A",            "nit": "890.324.568-9", "direccion": "Calle 10 #4-47, La Paila",     "telefono": "6023561234", "correo": "ventas@colombina.com",           "tipoDocumento": "NIT"},
 ]
 client_ids = []
-created = 0
-for cl in clients_data:
-    result = post(tok, "/clients", cl)
-    if result:
-        client_ids.append(result["id"])
-        created += 1
-print(f"  Creados: {created} | Total ahora: {count(tok, '/clients')}")
+for c in clientes_data:
+    r = post("/clients", c)
+    if r.status_code == 201:
+        cid = r.json()["id"]
+        client_ids.append(cid)
+        ok(f"Cliente '{c['nombre']}' -> id={cid[:8]}")
+    elif r.status_code == 409:
+        inf(f"Cliente '{c['nombre']}' ya existe — reutilizando")
+        existing = requests.get(f"{API}/clients", headers=H, timeout=15).json().get("items", [])
+        for ex in existing:
+            if ex.get("nombre") == c["nombre"]:
+                client_ids.append(ex["id"])
+                inf(f"  id={ex['id'][:8]} (reutilizado)")
+                break
+    else:
+        err(f"Cliente '{c['nombre']}': {r.status_code} {r.text[:80]}")
 
-# ── 4. FINAL RECIPIENTS ───────────────────────────────────────────────────────
-
-section("FINAL RECIPIENTS")
-existing = count(tok, "/final-recipients")
-print(f"  Existentes: {existing}")
-recipients_data = [
-    {"name": "Bodega Central Bogotá", "phone": "+57 1 4567890", "email": f"bodega{uid(4)}@bcbogota.com", "address": "Zona Industrial Puente Aranda # 20-40", "city": "Bogotá", "department": "Cundinamarca", "postal_code": "110931", "special_instructions": "Entregar de lunes a viernes 7am-4pm"},
-    {"name": "Centro Logístico Medellín", "phone": "+57 4 3456789", "email": f"recep{uid(4)}@logimed.com", "address": "Carrera 50 # 30-15", "city": "Medellín", "department": "Antioquia", "postal_code": "050010", "special_instructions": "Llamar 30 min antes de entrega"},
-    {"name": "Almacén General Cali Sur", "phone": "+57 2 5678901", "email": f"almacen{uid(4)}@calisur.com", "address": "Av. Cañasgordas # 10-25", "city": "Cali", "department": "Valle del Cauca", "postal_code": "760030"},
-    {"name": "Depósito Caribe Barranquilla", "phone": "+57 5 6789012", "email": f"dep{uid(4)}@caribedep.com", "address": "Zona Franca # 15-60", "city": "Barranquilla", "department": "Atlántico", "postal_code": "080001", "special_instructions": "Acceso solo por puerta sur"},
-    {"name": "Distribuidora Nacional Bucaramanga", "phone": "+57 7 7890123", "email": f"dist{uid(4)}@disnacional.com", "address": "Parque Industrial # 8-40", "city": "Bucaramanga", "department": "Santander", "postal_code": "680001"},
-    {"name": "Centro Comercial Unicentro", "phone": "+57 1 8901234", "email": f"recibo{uid(4)}@unicentro.com", "address": "Av. 15 # 123-30", "city": "Bogotá", "department": "Cundinamarca", "postal_code": "110111", "special_instructions": "Solo domingos 6am-8am por servicio de carga"},
-    {"name": "Puerto Seco Calarcá", "phone": "+57 6 9012345", "email": f"puerto{uid(4)}@psecocalarca.com", "address": "Km 5 vía Armenia # 1", "city": "Calarcá", "department": "Quindío", "postal_code": "630002"},
-    {"name": "Frigorífico del Oriente", "phone": "+57 8 0123456", "email": f"frigori{uid(4)}@frigoriente.com", "address": "Km 3 Vía Cúcuta # 200", "city": "Cúcuta", "department": "Norte de Santander", "postal_code": "540001", "special_instructions": "Temperatura mínima -18°C requerida"},
-    {"name": "Almacenes Flamingo Pereira", "phone": "+57 6 1234567", "email": f"alm{uid(4)}@flamingo.com", "address": "Calle 19 # 8-60", "city": "Pereira", "department": "Risaralda", "postal_code": "660001"},
-    {"name": "Mega Bodega Cartagena", "phone": "+57 5 2345678", "email": f"mega{uid(4)}@megabodega.com", "address": "Manga # 30-20", "city": "Cartagena", "department": "Bolívar", "postal_code": "130001", "special_instructions": "No entrar con vehículos > 15 toneladas"},
-]
-recipient_ids = []
-created = 0
-for rec in recipients_data:
-    result = post(tok, "/final-recipients", rec)
-    if result:
-        recipient_ids.append(result["id"])
-        created += 1
-print(f"  Creados: {created} | Total ahora: {count(tok, '/final-recipients')}")
-
-# ── 5. TRIP STATUSES ─────────────────────────────────────────────────────────
-
-section("TRIP STATUSES")
-existing = count(tok, "/trip-statuses")
-print(f"  Existentes: {existing}")
-statuses_data = [
-    {"name": "Programado", "description": "Viaje agendado, pendiente de inicio", "sequence_order": 1, "is_terminal": False},
-    {"name": "En Preparación", "description": "Cargando mercancía en origen", "sequence_order": 2, "is_terminal": False},
-    {"name": "En Tránsito", "description": "Vehículo en ruta hacia destino", "sequence_order": 3, "is_terminal": False},
-    {"name": "En Parada", "description": "Detenido en punto intermedio autorizado", "sequence_order": 4, "is_terminal": False},
-    {"name": "Llegó a Destino", "description": "Vehículo en ubicación de entrega", "sequence_order": 5, "is_terminal": False},
-    {"name": "Entregado", "description": "Mercancía entregada al destinatario final", "sequence_order": 6, "is_terminal": True},
-    {"name": "Cancelado", "description": "Viaje cancelado antes de iniciar", "sequence_order": 10, "is_terminal": True},
-    {"name": "Con Novedad", "description": "Incidente reportado durante el viaje", "sequence_order": 7, "is_terminal": False},
-    {"name": "Devuelto", "description": "Mercancía regresó al punto de origen", "sequence_order": 8, "is_terminal": True},
-    {"name": "Liquidado", "description": "Viaje completado y factura cerrada", "sequence_order": 9, "is_terminal": True},
-]
-status_ids = []
-created = 0
-for st in statuses_data:
-    result = post(tok, "/trip-statuses", st)
-    if result:
-        status_ids.append(result["id"])
-        created += 1
-print(f"  Creados: {created} | Total ahora: {count(tok, '/trip-statuses')}")
-
-# ── 6. DRIVERS ────────────────────────────────────────────────────────────────
-
-section("DRIVERS")
-existing = count(tok, "/drivers")
-print(f"  Existentes: {existing}")
-drivers_data = [
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Carlos", "last_name": "Rodríguez Pérez", "phone": "+57 310 1112233", "address": "Carrera 15 # 80-10, Bogotá", "email": f"carlos{uid(3)}@mail.com", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C2", "license_expiry": future(500)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "María", "last_name": "González Luna", "phone": "+57 315 2223344", "address": "Calle 72 # 11-09, Medellín", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C1", "license_expiry": future(600)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Pedro", "last_name": "Martínez Díaz", "phone": "+57 320 3334455", "address": "Av. Principal # 5-30, Cali", "email": f"pedro{uid(3)}@mail.com", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C3", "license_expiry": future(400)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Ana", "last_name": "López Vargas", "phone": "+57 321 4445566", "address": "Calle 50 # 20-40, Barranquilla", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C2", "license_expiry": future(700)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Luis", "last_name": "Herrera Campos", "phone": "+57 312 5556677", "address": "Carrera 8 # 30-15, Bucaramanga", "email": f"luis{uid(3)}@mail.com", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C1", "license_expiry": future(450)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Sandra", "last_name": "Ríos Mora", "phone": "+57 318 6667788", "address": "Av. 30 # 10-20, Pereira", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C2", "license_expiry": future(550)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Jorge", "last_name": "Castaño Pinto", "phone": "+57 316 7778899", "address": "Calle 18 # 40-55, Cartagena", "email": f"jorge{uid(3)}@mail.com", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C3", "license_expiry": future(365)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Patricia", "last_name": "Mora Suárez", "phone": "+57 322 8889900", "address": "Carrera 20 # 15-30, Armenia", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C1", "license_expiry": future(620)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Diego", "last_name": "Salcedo Cruz", "phone": "+57 314 9990011", "address": "Av. Las Palmas # 8-90, Ibagué", "email": f"diego{uid(3)}@mail.com", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C2", "license_expiry": future(480)},
-    {"id_number": str(random.randint(10000000,99999999)), "first_name": "Camila", "last_name": "Vásquez Rueda", "phone": "+57 311 0001122", "address": "Calle 100 # 25-60, Bogotá", "license_number": f"LIC{random.randint(10000,99999)}", "license_category": "C1", "license_expiry": future(730)},
+# ── 3. CONDUCTORES ────────────────────────────────────────────────────────────
+sep("CONDUCTORES")
+conductores_data = [
+    {"fullName": "Juan Carlos Perez Rodriguez",  "cedula": "12345678", "telefono": "3001234001", "direccion": "Calle 45 #23-12, Bogota",    "correo": "jcperez@gmail.com",    "numeroLicencia": "LIC001COL", "categoriaLicencia": "C2", "fechaVencimientoLicencia": "2027-12-31T23:59:59"},
+    {"fullName": "Andres Felipe Torres Mesa",    "cedula": "23456789", "telefono": "3112345002", "direccion": "Cra 8 #12-45, Cali",          "correo": "aftorres@gmail.com",   "numeroLicencia": "LIC002COL", "categoriaLicencia": "C3", "fechaVencimientoLicencia": "2028-06-30T23:59:59"},
+    {"fullName": "Ricardo Antonio Gomez Vargas", "cedula": "34567890", "telefono": "3201234003", "direccion": "Av 30 #45-67, Medellin",      "correo": "ragomez@hotmail.com",  "numeroLicencia": "LIC003COL", "categoriaLicencia": "C2", "fechaVencimientoLicencia": "2027-03-15T23:59:59"},
+    {"fullName": "Luis Alberto Martinez Soto",   "cedula": "45678901", "telefono": "3004567004", "direccion": "Calle 72 #15-30, Barranquilla","correo": "lamartinez@gmail.com", "numeroLicencia": "LIC004COL", "categoriaLicencia": "C1", "fechaVencimientoLicencia": "2029-01-20T23:59:59"},
+    {"fullName": "Carlos Arturo Diaz Hernandez", "cedula": "56789012", "telefono": "3153456005", "direccion": "Cra 27 #48-32, Bucaramanga",  "correo": "cadiaz@gmail.com",     "numeroLicencia": "LIC005COL", "categoriaLicencia": "C3", "fechaVencimientoLicencia": "2028-09-10T23:59:59"},
+    {"fullName": "Miguel Angel Ruiz Castro",     "cedula": "67890123", "telefono": "3024567006", "direccion": "Calle 10 #5-22, Pereira",     "correo": "maruiz@gmail.com",     "numeroLicencia": "LIC006COL", "categoriaLicencia": "C2", "fechaVencimientoLicencia": "2027-07-25T23:59:59"},
+    {"fullName": "Eduardo Jose Ramirez Pinto",   "cedula": "78901234", "telefono": "3175678007", "direccion": "Av 3 #23-45, Cucuta",         "correo": "ejramirez@gmail.com",  "numeroLicencia": "LIC007COL", "categoriaLicencia": "C1", "fechaVencimientoLicencia": "2028-11-30T23:59:59"},
+    {"fullName": "Fernando Andres Lopez Mora",   "cedula": "89012345", "telefono": "3056789008", "direccion": "Cra 15 #8-30, Manizales",     "correo": "falopez@gmail.com",    "numeroLicencia": "LIC008COL", "categoriaLicencia": "C3", "fechaVencimientoLicencia": "2029-04-15T23:59:59"},
 ]
 driver_ids = []
-created = 0
-for dr in drivers_data:
-    result = post(tok, "/drivers", dr)
-    if result:
-        driver_ids.append(result["id"])
-        created += 1
-print(f"  Creados: {created} | Total ahora: {count(tok, '/drivers')}")
-
-# ── 7. VEHICLES ───────────────────────────────────────────────────────────────
-
-section("VEHICLES")
-existing = count(tok, "/vehicles")
-print(f"  Existentes: {existing}")
-co_id = company_ids[0] if company_ids else "000000000000000000000001"
-vehicles_data = [
-    {"plate": f"T{uid(3)}A1", "vehicle_type": "truck", "brand": "Volvo", "model_year": 2020, "capacity_tons": 30.0, "volume_m3": 80.0, "company_id": co_id, "soat_expiry": future(365), "tech_review_expiry": future(180)},
-    {"plate": f"V{uid(3)}B2", "vehicle_type": "van", "brand": "Mercedes", "model_year": 2022, "capacity_tons": 5.0, "volume_m3": 18.0, "company_id": co_id, "soat_expiry": future(300)},
-    {"plate": f"T{uid(3)}C3", "vehicle_type": "truck", "brand": "Kenworth", "model_year": 2019, "capacity_tons": 35.0, "volume_m3": 90.0, "company_id": co_id, "soat_expiry": future(400), "tech_review_expiry": future(200)},
-    {"plate": f"F{uid(3)}D4", "vehicle_type": "flatbed", "brand": "Freightliner", "model_year": 2021, "capacity_tons": 25.0, "volume_m3": 60.0, "company_id": co_id, "soat_expiry": future(350)},
-    {"plate": f"T{uid(3)}E5", "vehicle_type": "truck", "brand": "Scania", "model_year": 2023, "capacity_tons": 28.0, "volume_m3": 75.0, "company_id": co_id, "soat_expiry": future(500), "tech_review_expiry": future(250)},
-    {"plate": f"V{uid(3)}F6", "vehicle_type": "van", "brand": "Ford", "model_year": 2022, "capacity_tons": 3.0, "volume_m3": 12.0, "company_id": co_id, "soat_expiry": future(280)},
-    {"plate": f"T{uid(3)}G7", "vehicle_type": "truck", "brand": "International", "model_year": 2018, "capacity_tons": 32.0, "volume_m3": 85.0, "company_id": co_id, "soat_expiry": future(320)},
-    {"plate": f"F{uid(3)}H8", "vehicle_type": "flatbed", "brand": "Mack", "model_year": 2020, "capacity_tons": 20.0, "volume_m3": 50.0, "company_id": co_id, "soat_expiry": future(390)},
-    {"plate": f"V{uid(3)}I9", "vehicle_type": "refrigerated", "brand": "Isuzu", "model_year": 2021, "capacity_tons": 8.0, "volume_m3": 25.0, "company_id": co_id, "soat_expiry": future(420)},
-    {"plate": f"T{uid(3)}J0", "vehicle_type": "truck", "brand": "MAN", "model_year": 2022, "capacity_tons": 26.0, "volume_m3": 70.0, "company_id": co_id, "soat_expiry": future(460)},
-]
-vehicle_ids = []
-created = 0
-for v in vehicles_data:
-    result = post(tok, "/vehicles", v)
-    if result:
-        vehicle_ids.append(result["id"])
-        created += 1
-print(f"  Creados: {created} | Total ahora: {count(tok, '/vehicles')}")
-
-# ── 8. TRIPS ──────────────────────────────────────────────────────────────────
-
-section("TRIPS")
-existing = count(tok, "/trips")
-print(f"  Existentes: {existing}")
-
-v_id = vehicle_ids[0] if vehicle_ids else "000000000000000000000001"
-d_id = driver_ids[0] if driver_ids else "000000000000000000000001"
-ca_id = cargo_ids[0] if cargo_ids else "000000000000000000000001"
-cl_id = client_ids[0] if client_ids else "000000000000000000000001"
-r_id = recipient_ids[0] if recipient_ids else "000000000000000000000001"
-
-trips_data = [
-    {"origin": "Bogota, Cundinamarca", "destination": "Medellin, Antioquia", "departure_date": future_utc(5), "arrival_date": future_utc(6),"weight_tons": 15.0, "total_cost": 4500000.0, "vehicle_id": v_id, "driver_id": d_id, "cargo_id": ca_id, "client_id": cl_id, "recipient_id": r_id, "notes": "Carga general, frágil en cima"},
-    {"origin": "Medellin, Antioquia", "destination": "Cali, Valle del Cauca", "departure_date": future_utc(7), "arrival_date": future_utc(8),"weight_tons": 8.0, "total_cost": 2800000.0, "vehicle_id": vehicle_ids[1] if len(vehicle_ids)>1 else v_id, "driver_id": driver_ids[1] if len(driver_ids)>1 else d_id, "cargo_id": cargo_ids[1] if len(cargo_ids)>1 else ca_id, "client_id": client_ids[1] if len(client_ids)>1 else cl_id, "recipient_id": recipient_ids[1] if len(recipient_ids)>1 else r_id},
-    {"origin": "Cali, Valle", "destination": "Barranquilla, Atlántico", "departure_date": future(10), "weight_tons": 20.0, "total_cost": 6200000.0, "vehicle_id": vehicle_ids[2] if len(vehicle_ids)>2 else v_id, "driver_id": driver_ids[2] if len(driver_ids)>2 else d_id, "cargo_id": cargo_ids[2] if len(cargo_ids)>2 else ca_id, "client_id": client_ids[2] if len(client_ids)>2 else cl_id, "recipient_id": recipient_ids[2] if len(recipient_ids)>2 else r_id},
-    {"origin": "Barranquilla, Atlántico", "destination": "Bucaramanga, Santander", "departure_date": future(12), "weight_tons": 12.0, "total_cost": 3100000.0, "vehicle_id": vehicle_ids[3] if len(vehicle_ids)>3 else v_id, "driver_id": driver_ids[3] if len(driver_ids)>3 else d_id, "cargo_id": cargo_ids[0], "client_id": client_ids[3] if len(client_ids)>3 else cl_id, "recipient_id": recipient_ids[3] if len(recipient_ids)>3 else r_id},
-    {"origin": "Bogotá, Cundinamarca", "destination": "Cartagena, Bolívar", "departure_date": future(14), "weight_tons": 25.0, "total_cost": 7800000.0, "vehicle_id": vehicle_ids[4] if len(vehicle_ids)>4 else v_id, "driver_id": driver_ids[4] if len(driver_ids)>4 else d_id, "cargo_id": cargo_ids[1] if len(cargo_ids)>1 else ca_id, "client_id": client_ids[4] if len(client_ids)>4 else cl_id, "recipient_id": recipient_ids[4] if len(recipient_ids)>4 else r_id},
-    {"origin": "Pereira, Risaralda", "destination": "Manizales, Caldas", "departure_date": future(3), "weight_tons": 5.0, "total_cost": 950000.0, "vehicle_id": vehicle_ids[5] if len(vehicle_ids)>5 else v_id, "driver_id": driver_ids[5] if len(driver_ids)>5 else d_id, "cargo_id": cargo_ids[2] if len(cargo_ids)>2 else ca_id, "client_id": client_ids[5] if len(client_ids)>5 else cl_id, "recipient_id": recipient_ids[5] if len(recipient_ids)>5 else r_id},
-    {"origin": "Ibagué, Tolima", "destination": "Villavicencio, Meta", "departure_date": future(8), "weight_tons": 18.0, "total_cost": 4100000.0, "vehicle_id": vehicle_ids[6] if len(vehicle_ids)>6 else v_id, "driver_id": driver_ids[6] if len(driver_ids)>6 else d_id, "cargo_id": cargo_ids[3] if len(cargo_ids)>3 else ca_id, "client_id": client_ids[6] if len(client_ids)>6 else cl_id, "recipient_id": recipient_ids[6] if len(recipient_ids)>6 else r_id},
-    {"origin": "Armenia, Quindío", "destination": "Cúcuta, Norte de Santander", "departure_date": future(15), "weight_tons": 30.0, "total_cost": 8500000.0, "vehicle_id": vehicle_ids[7] if len(vehicle_ids)>7 else v_id, "driver_id": driver_ids[7] if len(driver_ids)>7 else d_id, "cargo_id": cargo_ids[4] if len(cargo_ids)>4 else ca_id, "client_id": client_ids[7] if len(client_ids)>7 else cl_id, "recipient_id": recipient_ids[7] if len(recipient_ids)>7 else r_id},
-    {"origin": "Cartagena, Bolívar", "destination": "Bogotá, Cundinamarca", "departure_date": future(20), "weight_tons": 10.0, "total_cost": 3600000.0, "vehicle_id": vehicle_ids[8] if len(vehicle_ids)>8 else v_id, "driver_id": driver_ids[8] if len(driver_ids)>8 else d_id, "cargo_id": cargo_ids[5] if len(cargo_ids)>5 else ca_id, "client_id": client_ids[8] if len(client_ids)>8 else cl_id, "recipient_id": recipient_ids[8] if len(recipient_ids)>8 else r_id},
-    {"origin": "Bogotá, Cundinamarca", "destination": "Santa Marta, Magdalena", "departure_date": future(25), "weight_tons": 22.0, "total_cost": 6800000.0, "vehicle_id": vehicle_ids[9] if len(vehicle_ids)>9 else v_id, "driver_id": driver_ids[9] if len(driver_ids)>9 else d_id, "cargo_id": cargo_ids[6] if len(cargo_ids)>6 else ca_id, "client_id": client_ids[9] if len(client_ids)>9 else cl_id, "recipient_id": recipient_ids[9] if len(recipient_ids)>9 else r_id},
-]
-trip_ids = []
-created = 0
-for tr in trips_data:
-    result = post(tok, "/trips", tr)
-    if result:
-        trip_ids.append(result["id"])
-        created += 1
+for d in conductores_data:
+    r = post("/drivers", d)
+    if r.status_code == 201:
+        did = r.json()["id"]
+        driver_ids.append(did)
+        ok(f"Conductor '{d['fullName']}' cedula={d['cedula']} -> id={did[:8]}")
+    elif r.status_code == 409:
+        inf(f"Conductor cedula={d['cedula']} ya existe — reutilizando")
+        existing = requests.get(f"{API}/drivers", headers=H, timeout=15).json().get("items", [])
+        for ex in existing:
+            if ex.get("cedula") == d["cedula"]:
+                driver_ids.append(ex["id"])
+                inf(f"  id={ex['id'][:8]} (reutilizado)")
+                break
     else:
-        # Get detailed error
-        r = requests.post(f"{API}/trips", headers=H(tok), json=tr, timeout=15)
-        print(f"  WARN trip: {r.status_code} {r.text[:100]}")
-print(f"  Creados: {created} | Total ahora: {count(tok, '/trips')}")
+        err(f"Conductor '{d['fullName']}': {r.status_code} {r.text[:100]}")
+
+# ── 4. VEHÍCULOS ──────────────────────────────────────────────────────────────
+sep("VEHICULOS")
+vehicle_ids = []
+if not company_ids:
+    err("No hay empresas — omitiendo vehiculos")
+else:
+    vehiculos_data = [
+        {"placa": "VHF001", "marca": "Kenworth",       "modelo": 2022, "capacidad": 35.0, "transportistaId": company_ids[0 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF002", "marca": "Freightliner",   "modelo": 2021, "capacidad": 30.0, "transportistaId": company_ids[0 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF003", "marca": "Volvo",          "modelo": 2023, "capacidad": 40.0, "transportistaId": company_ids[1 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF004", "marca": "Mack",           "modelo": 2020, "capacidad": 28.0, "transportistaId": company_ids[1 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF005", "marca": "International",  "modelo": 2022, "capacidad": 32.0, "transportistaId": company_ids[2 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF006", "marca": "Mercedes-Benz",  "modelo": 2021, "capacidad": 25.0, "transportistaId": company_ids[2 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF007", "marca": "Scania",         "modelo": 2023, "capacidad": 38.0, "transportistaId": company_ids[3 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF008", "marca": "Kenworth",       "modelo": 2019, "capacidad": 22.0, "transportistaId": company_ids[3 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF009", "marca": "Volvo",          "modelo": 2024, "capacidad": 45.0, "transportistaId": company_ids[4 % len(company_ids)], "estado": "Disponible"},
+        {"placa": "VHF010", "marca": "Freightliner",   "modelo": 2022, "capacidad": 33.0, "transportistaId": company_ids[4 % len(company_ids)], "estado": "Disponible"},
+    ]
+    for v in vehiculos_data:
+        r = post("/vehicles", v)
+        if r.status_code == 201:
+            vid = r.json()["id"]
+            vehicle_ids.append(vid)
+            ok(f"Vehiculo {v['placa']} {v['marca']} {v['modelo']} -> id={vid[:8]}")
+        elif r.status_code == 409:
+            inf(f"Vehiculo '{v['placa']}' ya existe — reutilizando")
+            existing = requests.get(f"{API}/vehicles", headers=H, timeout=15).json().get("items", [])
+            for ex in existing:
+                if ex.get("placa") == v["placa"]:
+                    vehicle_ids.append(ex["id"])
+                    inf(f"  id={ex['id'][:8]} (reutilizado)")
+                    break
+        else:
+            err(f"Vehiculo '{v['placa']}': {r.status_code} {r.text[:100]}")
+
+# ── 5. TIPOS DE CARGA ─────────────────────────────────────────────────────────
+sep("TIPOS DE CARGA")
+cargos_data = [
+    {"nombre": "Alimentos Perecederos",    "descripcion": "Frutas, verduras y productos refrigerados",   "precioPorTon": 250000.0},
+    {"nombre": "Bebidas y Liquidos",       "descripcion": "Agua, jugos, gaseosas y licores",             "precioPorTon": 180000.0},
+    {"nombre": "Materiales Construccion",  "descripcion": "Cemento, arena, bloques y varillas",          "precioPorTon": 85000.0},
+    {"nombre": "Productos Industriales",   "descripcion": "Maquinaria, repuestos y equipos",             "precioPorTon": 320000.0},
+    {"nombre": "Textiles y Confeccion",    "descripcion": "Ropa, telas y calzado",                       "precioPorTon": 420000.0},
+    {"nombre": "Electrodomesticos",        "descripcion": "Neveras, lavadoras y televisores",            "precioPorTon": 380000.0},
+    {"nombre": "Papel y Carton",           "descripcion": "Resmas, cajas y empaques",                    "precioPorTon": 140000.0},
+    {"nombre": "Productos Quimicos",       "descripcion": "Fertilizantes y agroquimicos (no peligrosos)","precioPorTon": 195000.0},
+]
+cargo_ids = []
+for c in cargos_data:
+    r = post("/cargo-types", c)
+    if r.status_code == 201:
+        cid = r.json()["id"]
+        cargo_ids.append(cid)
+        ok(f"Tipo carga '{c['nombre']}' -> id={cid[:8]}")
+    elif r.status_code == 409:
+        inf(f"Tipo carga '{c['nombre']}' ya existe — reutilizando")
+        existing = requests.get(f"{API}/cargo-types", headers=H, timeout=15).json().get("items", [])
+        for ex in existing:
+            if ex.get("nombre") == c["nombre"]:
+                cargo_ids.append(ex["id"])
+                inf(f"  id={ex['id'][:8]} (reutilizado)")
+                break
+    else:
+        err(f"Tipo carga '{c['nombre']}': {r.status_code} {r.text[:80]}")
+
+# ── 6. DESTINATARIOS FINALES ──────────────────────────────────────────────────
+sep("DESTINATARIOS FINALES")
+destinatarios_data = [
+    {"nombre": "Bodega Logistica Norte",          "nit": "900.111.222-3", "direccion": "Zona Industrial Calle 80, Bogota",   "telefono": "6013334455", "correo": "bodega.norte@logistica.com"},
+    {"nombre": "Centro Distribucion Medellin",    "nit": "811.222.333-4", "direccion": "Autopista Sur Km 5, Medellin",       "telefono": "6044556677", "correo": "cd.medellin@distribucion.com"},
+    {"nombre": "Puerto Logistico Barranquilla",   "nit": "890.333.444-5", "direccion": "Cra 46 #74-50, Barranquilla",        "telefono": "6055667788", "correo": "puerto@logbarranquilla.com"},
+    {"nombre": "Almacen Exito Cali Norte",        "nit": "860.007.539-6", "direccion": "Av 6N #25N-103, Cali",              "telefono": "6024445566", "correo": "logistica.calinorte@exito.com"},
+    {"nombre": "Planta Bavaria Tocancipa",        "nit": "860.034.314-8", "direccion": "Via Briceno Km 7, Tocancipa",       "telefono": "6018887766", "correo": "planta.tocancipa@bavaria.com"},
+    {"nombre": "Planta Postobon Bogota",          "nit": "860.002.526-9", "direccion": "Av Esperanza #65-50, Bogota",       "telefono": "6012990011", "correo": "planta.bogota@postobon.com"},
+    {"nombre": "Bodega Colombina Cali",           "nit": "890.324.569-0", "direccion": "Calle 25 #28-40, Cali",            "telefono": "6023456789", "correo": "bodega.cali@colombina.com"},
+    {"nombre": "CEDIS Corona Bogota",             "nit": "860.007.383-4", "direccion": "Cra 97 #24-55, Bogota",            "telefono": "6017654321", "correo": "cedis@corona.com.co"},
+]
+recipient_ids = []
+for d in destinatarios_data:
+    r = post("/final-recipients", d)
+    if r.status_code == 201:
+        rid = r.json()["id"]
+        recipient_ids.append(rid)
+        ok(f"Destinatario '{d['nombre']}' -> id={rid[:8]}")
+    elif r.status_code == 409:
+        inf(f"Destinatario '{d['nombre']}' ya existe — reutilizando")
+        existing = requests.get(f"{API}/final-recipients", headers=H, timeout=15).json().get("items", [])
+        for ex in existing:
+            if ex.get("nombre") == d["nombre"]:
+                recipient_ids.append(ex["id"])
+                inf(f"  id={ex['id'][:8]} (reutilizado)")
+                break
+    else:
+        err(f"Destinatario '{d['nombre']}': {r.status_code} {r.text[:80]}")
+
+# ── 7. VIAJES ─────────────────────────────────────────────────────────────────
+sep("VIAJES")
+
+if not (vehicle_ids and driver_ids and cargo_ids and client_ids and recipient_ids):
+    err("Faltan IDs para crear viajes — revisar errores anteriores")
+else:
+    now = datetime.now(timezone.utc)
+
+    # (origen_txt, destino_txt, offset_salida_dias, duracion_dias, peso_t, status_code)
+    # Todos se crean con fecha futura (validador rechaza pasado), luego se parchea el estado
+    viajes_config = [
+        ("Bogota, Cundinamarca",    "Medellin, Antioquia",      1,  3,  22.5,  "en_ruta"),
+        ("Cali, Valle del Cauca",   "Bogota, Cundinamarca",     1,  3,  18.0,  "en_ruta"),
+        ("Barranquilla, Atlantico", "Bogota, Cundinamarca",     2,  4,  30.0,  "en_ruta"),
+        ("Bogota, Cundinamarca",    "Cali, Valle del Cauca",    2,  4,  25.0,  "entregado"),
+        ("Medellin, Antioquia",     "Barranquilla, Atlantico",  3,  5,  15.5,  "entregado"),
+        ("Bogota, Cundinamarca",    "Cartagena, Bolivar",       3,  6,  28.0,  "entregado"),
+        ("Cucuta, Norte Santander", "Bogota, Cundinamarca",     4,  6,  20.0,  "entregado"),
+        ("Bogota, Cundinamarca",    "Bucaramanga, Santander",   5,  7,  19.0,  "programado"),
+        ("Medellin, Antioquia",     "Cali, Valle del Cauca",    6,  8,  35.0,  "programado"),
+        ("Barranquilla, Atlantico", "Medellin, Antioquia",      7, 10,  22.0,  "programado"),
+        ("Bogota, Cundinamarca",    "Pereira, Risaralda",       8, 10,  12.0,  "programado"),
+        ("Cali, Valle del Cauca",   "Pasto, Narino",            9, 11,  16.5,  "programado"),
+    ]
+
+    created_trips = []
+    for i, (origen, destino, d_sal, duracion, peso, status) in enumerate(viajes_config):
+        v_id  = vehicle_ids[i % len(vehicle_ids)]
+        dr_id = driver_ids[i % len(driver_ids)]
+        c_id  = cargo_ids[i % len(cargo_ids)]
+        cl_id = client_ids[i % len(client_ids)]
+        r_id  = recipient_ids[i % len(recipient_ids)]
+
+        sal  = (now + timedelta(days=d_sal)).replace(hour=8,  minute=0, second=0, microsecond=0)
+        ll   = (now + timedelta(days=d_sal + duracion)).replace(hour=18, minute=0, second=0, microsecond=0)
+        costo = round(peso * 200000, 2)
+
+        body = {
+            "origin":               origen,   # required text field in TripCreate
+            "destination":          destino,  # required text field in TripCreate
+            "vehiculoId":           v_id,
+            "conductorId":          dr_id,
+            "cargoTypeId":          c_id,
+            "transportistaId":      cl_id,
+            "destinoId":            r_id,
+            "peso":                 peso,
+            "costoTotal":           costo,
+            "fechaSalida":          sal.isoformat(),
+            "fechaLlegadaEstimada": ll.isoformat(),
+        }
+
+        r = post("/trips", body)
+        if r.status_code == 201:
+            trip = r.json()
+            tid = trip["id"]
+            created_trips.append(tid)
+            estado_inicial = trip.get("estado", "?")
+            ok(f"Viaje {i+1:02d}: {origen[:22]:22s} -> {destino[:22]:22s}  {peso}t  estado='{estado_inicial}'")
+
+            if status != "programado":
+                time.sleep(0.3)
+                rp = patch_status(tid, status)
+                if rp.status_code == 200:
+                    estado_final = rp.json().get("estado", "?")
+                    ok(f"         PATCH '{status}' -> estado='{estado_final}'")
+                else:
+                    err(f"         PATCH: {rp.status_code} {rp.text[:80]}")
+        else:
+            err(f"Viaje {i+1:02d}: {r.status_code} {r.text[:120]}")
 
 # ── RESUMEN ───────────────────────────────────────────────────────────────────
-
-print(f"\n{'='*55}")
-print("  RESUMEN FINAL")
-print("="*55)
-for m in ["companies","clients","drivers","vehicles","cargo-types","final-recipients","trip-statuses","trips","invoices"]:
-    total = count(tok, f"/{m}")
-    bar = "✓" if total >= 10 else f"→ faltan {10-total}"
-    print(f"  {m:<22}: {total:>3} registros  {bar}")
-print(f"{'='*55}")
-print("\nNota: Las facturas (invoices) se generan automáticamente al crear viajes.")
-print("      Si no aparecen aún, espera unos segundos y consulta /invoices.\n")
+sep("RESUMEN FINAL")
+inf(f"Empresas:         {len(company_ids)}")
+inf(f"Clientes:         {len(client_ids)}")
+inf(f"Conductores:      {len(driver_ids)}")
+inf(f"Vehiculos:        {len(vehicle_ids)}")
+inf(f"Tipos de carga:   {len(cargo_ids)}")
+inf(f"Destinatarios:    {len(recipient_ids)}")
+inf(f"Viajes:           {len(created_trips) if 'created_trips' in dir() else 0}")
+inf("")
+ok("Datos cargados. El dashboard ahora muestra actividad real.")

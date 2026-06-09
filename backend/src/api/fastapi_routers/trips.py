@@ -50,7 +50,10 @@ def _svc(db) -> TripService:
 @router.get("", status_code=200)
 async def list_trips(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=2000),
+    estado: Optional[str] = Query(None),
+    without_fulfillment: Optional[bool] = Query(None),  # Angular filter — accepted but not yet used
+    search: Optional[str] = Query(None),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):

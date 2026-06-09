@@ -19,7 +19,7 @@ def _svc(db) -> DriverService:
 @router.get("", status_code=200)
 async def list_drivers(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=2000),
     include_expired: bool = Query(False),
     db=Depends(get_db),
     user=Depends(get_current_user),

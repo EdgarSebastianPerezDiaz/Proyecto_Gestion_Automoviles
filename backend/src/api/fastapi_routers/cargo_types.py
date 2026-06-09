@@ -24,7 +24,7 @@ def _repo(db) -> CargoTypeRepository:
 @router.get("", status_code=200)
 async def list_cargo_types(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=2000),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):

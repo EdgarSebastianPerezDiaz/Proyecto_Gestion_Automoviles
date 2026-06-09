@@ -264,6 +264,8 @@ from src.api.fastapi_routers.invoices import router as invoices_router
 from src.api.fastapi_routers.cargo_types import router as cargo_types_router
 from src.api.fastapi_routers.final_recipients import router as final_recipients_router
 from src.api.fastapi_routers.trip_statuses import router as trip_statuses_router
+from src.api.fastapi_routers.users import router as users_router
+from src.api.fastapi_routers.audit import router as audit_router
 
 # Set dependencies for auth router
 auth_module.set_dependencies(db_connection, rate_limiter)
@@ -284,6 +286,8 @@ app.include_router(invoices_router, prefix="/invoices", tags=["invoices"])
 app.include_router(cargo_types_router, prefix="/cargo-types", tags=["cargo-types"])
 app.include_router(final_recipients_router, prefix="/final-recipients", tags=["final-recipients"])
 app.include_router(trip_statuses_router, prefix="/trip-statuses", tags=["trip-statuses"])
+app.include_router(users_router, prefix="/users", tags=["users"])
+app.include_router(audit_router, prefix="/audit", tags=["audit"])
 
 # ================================================================================
 # EXCEPTION HANDLERS

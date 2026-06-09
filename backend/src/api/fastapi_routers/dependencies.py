@@ -203,6 +203,7 @@ def to_frontend(collection: str, doc: Optional[dict]) -> Optional[dict]:
     elif collection == "trip_statuses":
         r["nombre"] = r.get("name", "")
         r["descripcion"] = r.get("description", "")
+        r["code"] = r.get("code", "")
 
     elif collection == "invoices":
         r["numeroFactura"] = r.get("invoice_number", "")

@@ -130,19 +130,27 @@ async def login(data: LoginRequest, request: Request):
 async def refresh_token(request: Request):
     """
     Refresh JWT access token using refresh token.
-    
-    Expects: refresh_token in request body or Authorization header
-    Returns: new access_token
+
+    Accepts refresh_token from:
+    - JSON body: {"refresh_token": "..."}
+    - Authorization header: Bearer <token>
     """
     try:
-        # Get refresh token from body or header
         refresh_token = None
-        
-        if request.headers.get("Authorization"):
+
+        # Priority 1: JSON body {"refresh_token": "..."}
+        try:
+            body = await request.json()
+            refresh_token = body.get("refresh_token") or body.get("refreshToken")
+        except Exception:
+            pass
+
+        # Priority 2: Authorization header
+        if not refresh_token and request.headers.get("Authorization"):
             auth_header = request.headers.get("Authorization")
             if auth_header.startswith("Bearer "):
                 refresh_token = auth_header[7:]
-        
+
         if not refresh_token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
