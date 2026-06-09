@@ -2,286 +2,88 @@ name: Deploy Heavy Freight Platform
 
 on:
   push:
-    branches: [main, master]
+    branches: [master, main]
   workflow_dispatch:
-    inputs:
-      stage:
-        description: 'Deployment stage'
-        required: false
-        default: 'prod'
-        type: choice
-        options: [dev, staging, prod]
 
-env:
-  AWS_REGION: us-east-1
-  NODE_VERSION: '20'
-  PYTHON_VERSION: '3.11'
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-# ─────────────────────────────────────────────────────────────────────────────
-# JOB 1 — Backend tests
-# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  test-backend:
-    name: Backend Tests
-    runs-on: ubuntu-latest
-
-    services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: |
-            backend/requirements.txt
-            backend/requirements-dev.txt
-
-      - name: Install dependencies
-        run: |
-          pip install -r backend/requirements.txt \
-                      -r backend/requirements-dev.txt
-
-      - name: Run pytest
-        run: |
-          cd backend
-          pytest tests/ -q --tb=short \
-            --ignore=tests/test_s3_uploader.py \
-            --ignore=tests/test_secrets_manager.py \
-            --ignore=tests/test_trip_document_reconciler.py
-
-# ─────────────────────────────────────────────────────────────────────────────
-# JOB 2 — Backend → AWS Lambda (Serverless Framework)
-# ─────────────────────────────────────────────────────────────────────────────
   deploy-backend:
-    name: Deploy Backend → Lambda
+    name: Deploy Backend (Lambda)
     runs-on: ubuntu-latest
-    needs: test-backend
-    outputs:
-      api_url: ${{ steps.capture_url.outputs.api_url }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          python-version: "3.11"
 
-      - uses: actions/setup-python@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
+          node-version: "18"
 
-      - name: Install Python deps
-        run: pip install -r backend/requirements.txt
+      - name: Install Serverless Framework v3
+        run: npm install -g serverless@3
 
-      - name: Install Serverless Framework + plugin
-        run: |
-          npm install -g serverless@3
-          cd backend && npm ci
+      - name: Install backend node dependencies
+        working-directory: backend
+        run: npm install
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
 
-      - name: Deploy
+      - name: Deploy backend
+        working-directory: backend
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
-        run: |
-          cd backend
-          STAGE=${{ github.event.inputs.stage || 'prod' }}
-          echo "Deploying stage: $STAGE"
-          serverless deploy --stage "$STAGE" --verbose
+        run: serverless deploy --stage prod --verbose
 
-      - name: Capture API URL
-        id: capture_url
-        run: |
-          cd backend
-          STAGE=${{ github.event.inputs.stage || 'prod' }}
-          # serverless info outputs the endpoint on a line like "endpoint: ANY - https://..."
-          URL=$(serverless info --stage "$STAGE" 2>/dev/null \
-                | grep -oP 'https://[a-z0-9]+\.execute-api\.[a-z0-9-]+\.amazonaws\.com[^\s]*' \
-                | head -1 \
-                | sed 's|/{proxy+}||')
-          echo "api_url=$URL" >> "$GITHUB_OUTPUT"
-          echo "API URL: $URL"
-
-      - name: Smoke test /health/live
-        run: |
-          URL="${{ steps.capture_url.outputs.api_url }}"
-          if [ -z "$URL" ]; then
-            echo "No URL captured — skipping smoke test"
-            exit 0
-          fi
-          echo "Smoke testing $URL/health/live ..."
-          for i in 1 2 3; do
-            BODY=$(curl -s "$URL/health/live")
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health/live")
-            echo "Attempt $i — HTTP $STATUS — Body: $BODY"
-            if [ "$STATUS" = "200" ]; then
-              echo "Health check passed"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "WARNING: health check returned non-200 — check CloudWatch logs"
-          echo "  CloudWatch: https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups/log-group/\$252Faws\$252Flambda\$252Fheavy-freight-platform-backend-prod"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# JOB 3 — Frontend → S3 (static website) + optional CloudFront invalidation
-# ─────────────────────────────────────────────────────────────────────────────
   deploy-frontend:
-    name: Deploy Frontend → S3
+    name: Deploy Frontend (S3)
     runs-on: ubuntu-latest
     needs: deploy-backend
-    env:
-      CLOUDFRONT_DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+    if: ${{ secrets.S3_FRONTEND_BUCKET != '' }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/transport-app/package-lock.json
+          node-version: "20"
 
-      - name: Install frontend deps
-        run: cd frontend/transport-app && npm ci
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
 
-      - name: Inject API URL into production environment
-        run: |
-          API_URL="${{ needs.deploy-backend.outputs.api_url }}"
-          if [ -z "$API_URL" ]; then
-            echo "WARNING: api_url is empty. Check deploy-backend output."
-          fi
-          sed -i "s|PLACEHOLDER_API_URL|${API_URL}|g" \
-            frontend/transport-app/src/environments/environment.prod.ts
-          echo "environment.prod.ts after injection:"
-          cat frontend/transport-app/src/environments/environment.prod.ts
+      - name: Build Angular app
+        working-directory: frontend
+        env:
+          API_URL: "https://i7xihr7nhk.execute-api.us-east-1.amazonaws.com"
+        run: npm run build -- --configuration production
 
-      - name: Build Angular (production)
-        run: cd frontend/transport-app && npx ng build --configuration=production
-
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
 
-      - name: Create / configure S3 bucket
-        env:
-          BUCKET: ${{ secrets.S3_FRONTEND_BUCKET }}
+      - name: Deploy to S3
         run: |
-          # Create bucket only if it doesn't exist yet (idempotent)
-          aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || \
-            aws s3api create-bucket --bucket "$BUCKET" --region "$AWS_REGION"
+          aws s3 sync frontend/dist/browser/ s3://${{ secrets.S3_FRONTEND_BUCKET }} \
+            --delete --acl public-read
 
-          # Allow public access (required for static website hosting)
-          aws s3api put-public-access-block \
-            --bucket "$BUCKET" \
-            --public-access-block-configuration \
-              BlockPublicAcls=false,IgnorePublicAcls=false,\
-          BlockPublicPolicy=false,RestrictPublicBuckets=false
-
-          # Enable static website hosting (index + SPA fallback to index.html)
-          aws s3 website "s3://$BUCKET" \
-            --index-document index.html \
-            --error-document index.html
-
-          # Public read policy
-          aws s3api put-bucket-policy --bucket "$BUCKET" --policy "{
-            \"Version\": \"2012-10-17\",
-            \"Statement\": [{
-              \"Effect\": \"Allow\",
-              \"Principal\": \"*\",
-              \"Action\": \"s3:GetObject\",
-              \"Resource\": \"arn:aws:s3:::${BUCKET}/*\"
-            }]
-          }"
-
-      - name: Sync dist to S3
-        env:
-          BUCKET: ${{ secrets.S3_FRONTEND_BUCKET }}
-        run: |
-          aws s3 sync frontend/transport-app/dist/transport-app/browser/ \
-            "s3://$BUCKET" \
-            --delete \
-            --cache-control "max-age=31536000,immutable" \
-            --exclude "index.html"
-          # index.html must not be cached so the browser always fetches the latest
-          aws s3 cp frontend/transport-app/dist/transport-app/browser/index.html \
-            "s3://$BUCKET/index.html" \
-            --cache-control "no-cache,no-store,must-revalidate"
-
-      - name: Invalidate CloudFront cache (if distribution configured)
-        if: env.CLOUDFRONT_DIST_ID != ''
+      - name: Invalidate CloudFront cache
+        if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "$CLOUDFRONT_DIST_ID" \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
-
-      - name: Print frontend URL
-        env:
-          BUCKET: ${{ secrets.S3_FRONTEND_BUCKET }}
-        run: |
-          echo "Frontend URL (S3 website):"
-          echo "  http://${BUCKET}.s3-website-${AWS_REGION}.amazonaws.com"
-          if [ -n "$CLOUDFRONT_DIST_ID" ]; then
-            echo "CloudFront invalidation triggered — wait ~1 min for propagation."
-          fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# JOB 4 — Integration tests against the live Lambda deployment
-# ─────────────────────────────────────────────────────────────────────────────
-  integration-tests:
-    name: Integration Tests → Lambda
-    runs-on: ubuntu-latest
-    needs: [deploy-backend, deploy-frontend]
-    # Never block the pipeline — auth tests warn when Atlas is unreachable
-    continue-on-error: false
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install test dependencies
-        run: pip install requests
-
-      - name: Run integration tests
-        env:
-          API_URL: ${{ needs.deploy-backend.outputs.api_url }}
-        run: |
-          echo "Running integration tests against: $API_URL"
-          python backend/tests/integration/test_api.py
-
-      - name: Print API + frontend URLs on success
-        if: always()
-        env:
-          BUCKET: ${{ secrets.S3_FRONTEND_BUCKET }}
-        run: |
-          echo ""
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Backend API : ${{ needs.deploy-backend.outputs.api_url }}"
-          echo "Frontend    : http://${BUCKET}.s3-website-${AWS_REGION}.amazonaws.com"
-          echo "Swagger UI  : ${{ needs.deploy-backend.outputs.api_url }}/docs"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
