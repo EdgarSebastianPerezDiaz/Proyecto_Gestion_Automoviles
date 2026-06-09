@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime, timezone
 from bson import ObjectId
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.repositories.trip_status_repository import TripStatusRepository
 from src.schemas.trip_status import TripStatusCreate, TripStatusUpdate
 
@@ -23,7 +23,7 @@ async def list_statuses(
 ):
     repo = _repo(db)
     items = repo.find_all(skip=skip, limit=limit)
-    return {"items": [serialize_doc(i) for i in items], "total": len(items), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("trip_statuses", i) for i in items], "total": len(items), "skip": skip, "limit": limit}
 
 
 @router.post("", status_code=201)
@@ -54,7 +54,7 @@ async def create_status(
     }
     inserted_id = repo.insert_one(doc)
     doc["_id"] = inserted_id
-    return serialize_doc(doc)
+    return to_frontend("trip_statuses", doc)
 
 
 @router.get("/{status_id}", status_code=200)
@@ -67,7 +67,7 @@ async def get_status(
     item = repo.find_by_id(status_id)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Trip status {status_id} not found")
-    return serialize_doc(item)
+    return to_frontend("trip_statuses", item)
 
 
 @router.put("/{status_id}", status_code=200)
@@ -83,7 +83,7 @@ async def update_status(
     update_fields = {k: v for k, v in data.model_dump(exclude_none=True).items()}
     update_fields["updated_at"] = datetime.now(timezone.utc)
     repo.update_one({"_id": ObjectId(status_id)}, {"$set": update_fields})
-    return serialize_doc(repo.find_by_id(status_id))
+    return to_frontend("trip_statuses", repo.find_by_id(status_id))
 
 
 @router.delete("/{status_id}", status_code=204)

@@ -50,3 +50,79 @@ def serialize_doc(doc: Optional[dict]) -> Optional[dict]:
         else:
             result[k] = v
     return result
+
+
+_VEHICLE_STATUS = {"available": "Disponible", "on_trip": "En Viaje", "inactive": "Inactivo"}
+
+
+def to_frontend(collection: str, doc: Optional[dict]) -> Optional[dict]:
+    """Serialize a MongoDB doc and add Spanish field aliases expected by the Angular frontend."""
+    r = serialize_doc(doc)
+    if r is None:
+        return None
+
+    if collection == "companies":
+        r["nombre"] = r.get("legal_name") or r.get("trade_name", "")
+        r["direccion"] = r.get("address", "")
+        r["telefono"] = r.get("phone", "")
+        r["correo"] = r.get("email", "")
+
+    elif collection == "clients":
+        r["nombre"] = r.get("name", "")
+        r["direccion"] = r.get("address", "")
+        r["telefono"] = r.get("phone", "")
+        r["correo"] = r.get("email", "")
+
+    elif collection == "drivers":
+        r["fullName"] = f"{r.get('first_name', '')} {r.get('last_name', '')}".strip()
+        r["cedula"] = r.get("id_number", "")
+        r["telefono"] = r.get("phone", "")
+        r["correo"] = r.get("email", "")
+        r["direccion"] = r.get("address", "")
+        r["numeroLicencia"] = r.get("license_number", "")
+        r["categoriaLicencia"] = r.get("license_category", "")
+        r["fechaVencimientoLicencia"] = str(r.get("license_expiry", ""))
+
+    elif collection == "cargo_types":
+        r["nombre"] = r.get("name", "")
+        r["descripcion"] = r.get("description", "")
+        r["precioPorTon"] = r.get("price_per_ton", 0)
+
+    elif collection == "vehicles":
+        r["placa"] = r.get("plate", "")
+        r["marca"] = r.get("brand", "")
+        r["modelo"] = str(r.get("model_year", ""))
+        r["capacidad"] = r.get("capacity_tons", 0)
+        r["transportistaId"] = r.get("company_id", "")
+        r["estado"] = _VEHICLE_STATUS.get(r.get("status", ""), r.get("status", "Disponible"))
+
+    elif collection == "final_recipients":
+        r["nombre"] = r.get("name", "")
+        r["direccion"] = r.get("address", "")
+        r["telefono"] = r.get("phone", "")
+        r["correo"] = r.get("email", "")
+
+    elif collection == "trips":
+        r["fechaSalida"] = r.get("departure_date")
+        r["fechaLlegadaEstimada"] = r.get("arrival_date")
+        r["fechaLlegadaReal"] = r.get("actual_arrival_date")
+        r["peso"] = r.get("weight_tons", 0)
+        r["costoTotal"] = r.get("total_cost", 0)
+        r["vehiculoId"] = r.get("vehicle_id", "")
+        r["conductorId"] = r.get("driver_id", "")
+        r["cargoTypeId"] = r.get("cargo_id", "")
+        r["documentos"] = r.get("documents", {})
+        r["estado"] = r.get("status") or "Programado"
+
+    elif collection == "trip_statuses":
+        r["nombre"] = r.get("name", "")
+        r["descripcion"] = r.get("description", "")
+
+    elif collection == "invoices":
+        r["numeroFactura"] = r.get("invoice_number", "")
+        r["monto"] = r.get("amount", 0)
+        r["impuesto"] = r.get("tax_amount", 0)
+        r["total"] = r.get("total_amount", 0)
+        r["estado"] = r.get("status", "")
+
+    return r

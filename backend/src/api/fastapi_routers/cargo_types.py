@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime, timezone
 from bson import ObjectId
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.repositories.cargo_type_repository import CargoTypeRepository
 from src.services.cargo_type_service import (
     CargoTypeService, CargoTypeAlreadyExistsError, CargoTypeNotFoundError, CargoTypeValidationError
@@ -30,7 +30,7 @@ async def list_cargo_types(
 ):
     svc = _svc(db)
     items = svc.list_active_cargo_types(skip=skip, limit=limit)
-    return {"items": [serialize_doc(i) for i in items], "total": len(items), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("cargo_types", i) for i in items], "total": len(items), "skip": skip, "limit": limit}
 
 
 @router.post("", status_code=201)
@@ -47,7 +47,7 @@ async def create_cargo_type(
             item = svc.get_cargo_type(result)
         else:
             item = result
-        return serialize_doc(item)
+        return to_frontend("cargo_types", item)
     except CargoTypeAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except CargoTypeValidationError as e:
@@ -63,7 +63,7 @@ async def get_cargo_type(
     svc = _svc(db)
     try:
         item = svc.get_cargo_type(cargo_id)
-        return serialize_doc(item)
+        return to_frontend("cargo_types", item)
     except CargoTypeNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -85,7 +85,7 @@ async def update_cargo_type(
         repo.update_one({"_id": ObjectId(cargo_id)}, {"$set": update_fields})
     except Exception:
         raise HTTPException(status_code=422, detail="Invalid cargo type data")
-    return serialize_doc(repo.find_by_id(cargo_id))
+    return to_frontend("cargo_types", repo.find_by_id(cargo_id))
 
 
 @router.delete("/{cargo_id}", status_code=204)

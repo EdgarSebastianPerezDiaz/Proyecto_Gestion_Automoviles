@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime, timezone
 import uuid
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.repositories.client_repository import ClientRepository
 from src.schemas.client import ClientCreate, ClientUpdate
 
@@ -24,7 +24,7 @@ async def list_clients(
 ):
     repo = _repo(db)
     items = repo.find_active(skip=skip, limit=limit)
-    return {"items": [serialize_doc(c) for c in items], "total": len(items), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("clients", c) for c in items], "total": len(items), "skip": skip, "limit": limit}
 
 
 @router.post("", status_code=201)
@@ -48,7 +48,7 @@ async def create_client(
     }
     inserted_id = repo.insert_one(doc)
     doc["_id"] = inserted_id
-    return serialize_doc(doc)
+    return to_frontend("clients", doc)
 
 
 @router.get("/{client_id}", status_code=200)
@@ -61,7 +61,7 @@ async def get_client(
     item = repo.find_by_id(client_id)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Client {client_id} not found")
-    return serialize_doc(item)
+    return to_frontend("clients", item)
 
 
 @router.put("/{client_id}", status_code=200)
@@ -77,7 +77,7 @@ async def update_client(
     update_data = data.model_dump(exclude_none=True)
     repo.update(client_id, update_data)
     updated = repo.find_by_id(client_id)
-    return serialize_doc(updated)
+    return to_frontend("clients", updated)
 
 
 @router.delete("/{client_id}", status_code=204)

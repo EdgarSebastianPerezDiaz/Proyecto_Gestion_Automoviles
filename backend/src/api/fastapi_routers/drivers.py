@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from typing import Optional
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.repositories.driver_repository import DriverRepository
 from src.services.driver_service import (
     DriverService, DriverAlreadyExistsError, DriverNotFoundError, DriverValidationError
@@ -26,7 +26,7 @@ async def list_drivers(
 ):
     svc = _svc(db)
     items = svc.list_drivers(skip=skip, limit=limit, include_expired=include_expired)
-    return {"items": [serialize_doc(d) for d in items], "total": len(items), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("drivers", d) for d in items], "total": len(items), "skip": skip, "limit": limit}
 
 
 @router.post("", status_code=201)
@@ -38,7 +38,7 @@ async def create_driver(
     svc = _svc(db)
     try:
         item = svc.create_driver(data.model_dump())
-        return serialize_doc(item)
+        return to_frontend("drivers", item)
     except DriverAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except DriverValidationError as e:
@@ -56,7 +56,7 @@ async def get_driver(
         item = svc.get_driver(driver_id)
         if item is None:
             raise HTTPException(status_code=404, detail=f"Driver {driver_id} not found")
-        return serialize_doc(item)
+        return to_frontend("drivers", item)
     except DriverNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -71,7 +71,7 @@ async def update_driver(
     svc = _svc(db)
     try:
         item = svc.update_driver(driver_id, data)
-        return serialize_doc(item)
+        return to_frontend("drivers", item)
     except DriverNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except DriverValidationError as e:

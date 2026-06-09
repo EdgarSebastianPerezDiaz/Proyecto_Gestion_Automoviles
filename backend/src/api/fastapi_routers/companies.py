@@ -1,6 +1,6 @@
 """Companies CRUD router."""
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.repositories.company_repository import CompanyRepository
 from src.services.company_service import (
     CompanyService, CompanyAlreadyExistsError, CompanyNotFoundError, CompanyValidationError
@@ -25,7 +25,7 @@ async def list_companies(
 ):
     svc = _svc(db)
     companies = svc.list_companies(skip=skip, limit=limit)
-    return {"items": [serialize_doc(c) for c in companies], "total": len(companies), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("companies", c) for c in companies], "total": len(companies), "skip": skip, "limit": limit}
 
 
 @router.post("", status_code=201)
@@ -37,7 +37,7 @@ async def create_company(
     svc = _svc(db)
     try:
         company = svc.create_company(data.model_dump())
-        return serialize_doc(company)
+        return to_frontend("companies", company)
     except CompanyAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except CompanyValidationError as e:
@@ -53,7 +53,7 @@ async def get_company(
     svc = _svc(db)
     try:
         company = svc.get_company(company_id)
-        return serialize_doc(company)
+        return to_frontend("companies", company)
     except CompanyNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -68,7 +68,7 @@ async def update_company(
     svc = _svc(db)
     try:
         company = svc.update_company(company_id, data)
-        return serialize_doc(company)
+        return to_frontend("companies", company)
     except CompanyNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except CompanyValidationError as e:

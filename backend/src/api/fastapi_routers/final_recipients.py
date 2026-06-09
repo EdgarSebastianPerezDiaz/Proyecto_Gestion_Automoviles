@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime, timezone
 from bson import ObjectId
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.repositories.final_recipient_repository import FinalRecipientRepository
 from src.schemas.final_recipient import FinalRecipientCreate, FinalRecipientUpdate
 
@@ -23,7 +23,7 @@ async def list_recipients(
 ):
     repo = _repo(db)
     items = repo.find_active(skip=skip, limit=limit)
-    return {"items": [serialize_doc(i) for i in items], "total": len(items), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("final_recipients", i) for i in items], "total": len(items), "skip": skip, "limit": limit}
 
 
 @router.post("", status_code=201)
@@ -48,7 +48,7 @@ async def create_recipient(
     }
     inserted_id = repo.insert_one(doc)
     doc["_id"] = inserted_id
-    return serialize_doc(doc)
+    return to_frontend("final_recipients", doc)
 
 
 @router.get("/{recipient_id}", status_code=200)
@@ -61,7 +61,7 @@ async def get_recipient(
     item = repo.find_by_id(recipient_id)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Recipient {recipient_id} not found")
-    return serialize_doc(item)
+    return to_frontend("final_recipients", item)
 
 
 @router.put("/{recipient_id}", status_code=200)
@@ -77,7 +77,7 @@ async def update_recipient(
     update_fields = {k: v for k, v in data.model_dump(exclude_none=True).items()}
     update_fields["updated_at"] = datetime.now(timezone.utc)
     repo.update_one({"_id": ObjectId(recipient_id)}, {"$set": update_fields})
-    return serialize_doc(repo.find_by_id(recipient_id))
+    return to_frontend("final_recipients", repo.find_by_id(recipient_id))
 
 
 @router.delete("/{recipient_id}", status_code=204)

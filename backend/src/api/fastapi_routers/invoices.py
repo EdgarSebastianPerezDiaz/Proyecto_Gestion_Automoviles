@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.services.invoice_service import InvoiceService, InvoiceError, InvoiceNotFoundError
 
 router = APIRouter()
@@ -28,7 +28,7 @@ async def list_invoices(
     if status:
         filters["status"] = status
     items = svc.list_invoices(filters=filters, limit=limit, skip=skip)
-    return {"items": [serialize_doc(i) for i in items], "total": len(items), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("invoices", i) for i in items], "total": len(items), "skip": skip, "limit": limit}
 
 
 @router.get("/{invoice_id}", status_code=200)
@@ -40,7 +40,7 @@ async def get_invoice(
     svc = _svc(db)
     try:
         item = svc.get_invoice(invoice_id)
-        return serialize_doc(item)
+        return to_frontend("invoices", item)
     except InvoiceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -54,7 +54,7 @@ async def mark_as_paid(
     svc = _svc(db)
     try:
         item = svc.mark_as_paid(invoice_id)
-        return serialize_doc(item)
+        return to_frontend("invoices", item)
     except InvoiceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except InvoiceError as e:
@@ -70,7 +70,7 @@ async def void_invoice(
     svc = _svc(db)
     try:
         item = svc.void_invoice(invoice_id)
-        return serialize_doc(item)
+        return to_frontend("invoices", item)
     except InvoiceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except InvoiceError as e:

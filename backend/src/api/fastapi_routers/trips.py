@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from typing import Optional
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.services.trip_service import TripService, TripError, TripNotFoundError, TripValidationError
 from src.schemas.trip import TripCreate
 
@@ -22,7 +22,7 @@ async def list_trips(
 ):
     svc = _svc(db)
     items = svc.list_trips(limit=limit, skip=skip)
-    return {"items": [serialize_doc(t) for t in items], "total": len(items), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("trips", t) for t in items], "total": len(items), "skip": skip, "limit": limit}
 
 
 @router.post("", status_code=201)
@@ -35,7 +35,7 @@ async def create_trip(
     user_id = user.get("user_id") or user.get("sub", "system")
     try:
         item = svc.create_trip(data.model_dump(), user_id=user_id)
-        return serialize_doc(item)
+        return to_frontend("trips", item)
     except TripValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TripError as e:
@@ -51,7 +51,7 @@ async def get_trip(
     svc = _svc(db)
     try:
         item = svc.get_trip(trip_id)
-        return serialize_doc(item)
+        return to_frontend("trips", item)
     except TripNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -70,7 +70,7 @@ async def update_trip_status(
         raise HTTPException(status_code=422, detail="status_code is required")
     try:
         item = svc.update_trip_status(trip_id, status_code, user_id)
-        return serialize_doc(item)
+        return to_frontend("trips", item)
     except TripNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except TripError as e:

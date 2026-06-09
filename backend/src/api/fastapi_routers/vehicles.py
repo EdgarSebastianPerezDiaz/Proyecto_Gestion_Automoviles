@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, serialize_doc
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
 from src.repositories.vehicle_repository import VehicleRepository
 from src.services.vehicle_service import (
     VehicleService, VehicleAlreadyExistsError, VehicleNotFoundError, VehicleValidationError
@@ -26,7 +26,7 @@ async def list_vehicles(
 ):
     svc = _svc(db)
     items = svc.list_vehicles(skip=skip, limit=limit, status_filter=status_filter)
-    return {"items": [serialize_doc(v) for v in items], "total": len(items), "skip": skip, "limit": limit}
+    return {"items": [to_frontend("vehicles", v) for v in items], "total": len(items), "skip": skip, "limit": limit}
 
 
 @router.post("", status_code=201)
@@ -38,7 +38,7 @@ async def create_vehicle(
     svc = _svc(db)
     try:
         item = svc.create_vehicle(data.model_dump())
-        return serialize_doc(item)
+        return to_frontend("vehicles", item)
     except VehicleAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except VehicleValidationError as e:
@@ -56,7 +56,7 @@ async def get_vehicle(
         item = svc.get_vehicle(vehicle_id)
         if item is None:
             raise HTTPException(status_code=404, detail=f"Vehicle {vehicle_id} not found")
-        return serialize_doc(item)
+        return to_frontend("vehicles", item)
     except VehicleNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -71,7 +71,7 @@ async def update_vehicle(
     svc = _svc(db)
     try:
         item = svc.update_vehicle(vehicle_id, data.model_dump(exclude_none=True))
-        return serialize_doc(item)
+        return to_frontend("vehicles", item)
     except VehicleNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except VehicleValidationError as e:
