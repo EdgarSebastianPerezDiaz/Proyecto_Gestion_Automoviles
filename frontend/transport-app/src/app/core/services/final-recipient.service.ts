@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
 export interface FinalRecipient {
@@ -22,7 +22,8 @@ export class FinalRecipientService {
   constructor(private http: HttpClient) {}
 
   getAll(): Observable<FinalRecipient[]> {
-    return this.http.get<FinalRecipient[]>(`${this.apiUrl}/final-recipients`).pipe(
+    return this.http.get<{ items: FinalRecipient[]; total: number }>(`${this.apiUrl}/final-recipients`).pipe(
+      map(r => r.items || []),
       catchError(() => of([]))
     );
   }

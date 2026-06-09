@@ -68,20 +68,21 @@ def to_frontend(collection: str, doc: Optional[dict]) -> Optional[dict]:
         r["correo"] = r.get("email", "")
 
     elif collection == "clients":
-        r["nombre"] = r.get("name", "")
-        r["direccion"] = r.get("address", "")
-        r["telefono"] = r.get("phone", "")
-        r["correo"] = r.get("email", "")
+        r["nombre"] = r.get("name") or ""
+        r["nit"] = r.get("nit") or ""
+        r["direccion"] = r.get("address") or ""
+        r["telefono"] = r.get("phone") or ""
+        r["correo"] = r.get("email") or ""
 
     elif collection == "drivers":
-        r["fullName"] = f"{r.get('first_name', '')} {r.get('last_name', '')}".strip()
-        r["cedula"] = r.get("id_number", "")
-        r["telefono"] = r.get("phone", "")
-        r["correo"] = r.get("email", "")
-        r["direccion"] = r.get("address", "")
-        r["numeroLicencia"] = r.get("license_number", "")
-        r["categoriaLicencia"] = r.get("license_category", "")
-        r["fechaVencimientoLicencia"] = str(r.get("license_expiry", ""))
+        r["fullName"] = f"{r.get('first_name') or ''} {r.get('last_name') or ''}".strip()
+        r["cedula"] = r.get("id_number") or ""
+        r["telefono"] = r.get("phone") or ""
+        r["correo"] = r.get("email") or ""
+        r["direccion"] = r.get("address") or ""
+        r["numeroLicencia"] = r.get("license_number") or ""
+        r["categoriaLicencia"] = r.get("license_category") or ""
+        r["fechaVencimientoLicencia"] = str(r.get("license_expiry") or "")
 
     elif collection == "cargo_types":
         r["nombre"] = r.get("name", "")
@@ -97,10 +98,11 @@ def to_frontend(collection: str, doc: Optional[dict]) -> Optional[dict]:
         r["estado"] = _VEHICLE_STATUS.get(r.get("status", ""), r.get("status", "Disponible"))
 
     elif collection == "final_recipients":
-        r["nombre"] = r.get("name", "")
-        r["direccion"] = r.get("address", "")
-        r["telefono"] = r.get("phone", "")
-        r["correo"] = r.get("email", "")
+        r["nombre"] = r.get("name") or ""
+        r["nit"] = r.get("nit") or ""
+        r["direccion"] = r.get("address") or ""
+        r["telefono"] = r.get("phone") or ""
+        r["correo"] = r.get("email") or ""
 
     elif collection == "trips":
         r["fechaSalida"] = r.get("departure_date")

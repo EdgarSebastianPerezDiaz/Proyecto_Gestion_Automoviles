@@ -411,6 +411,7 @@ class AuthService:
                 'jti': str(uuid.uuid4()),  # Unique JWT ID
                 'user_id': user_id,
                 'email': user_data['email'],
+                'full_name': user_data.get('full_name', ''),
                 'role': user_data['role'],
                 'iat': datetime.now(timezone.utc),
                 'exp': datetime.now(timezone.utc) + timedelta(minutes=15),

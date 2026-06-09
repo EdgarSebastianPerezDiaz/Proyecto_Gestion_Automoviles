@@ -102,7 +102,7 @@ async def login(data: LoginRequest, request: Request):
     
     try:
         auth_service = AuthService(_db_connection)
-        result = auth_service.login(
+        result = auth_service.login_with_refresh(
             email=data.email,
             password=data.password
         )

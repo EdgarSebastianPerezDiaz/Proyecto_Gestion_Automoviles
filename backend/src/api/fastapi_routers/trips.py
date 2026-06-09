@@ -56,16 +56,11 @@ async def get_trip(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.put("/{trip_id}/status", status_code=200)
-async def update_trip_status(
-    trip_id: str,
-    data: dict = Body(...),
-    db=Depends(get_db),
-    user=Depends(get_current_user),
-):
+async def _do_update_trip_status(trip_id: str, data: dict, db, user):
     svc = _svc(db)
     user_id = user.get("user_id") or user.get("sub", "system")
-    status_code = data.get("status_code") or data.get("status")
+    # Accept status_code, status, or estado (Spanish field used by Angular TripService)
+    status_code = data.get("status_code") or data.get("status") or data.get("estado")
     if not status_code:
         raise HTTPException(status_code=422, detail="status_code is required")
     try:
@@ -75,6 +70,26 @@ async def update_trip_status(
         raise HTTPException(status_code=404, detail=str(e))
     except TripError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/{trip_id}/status", status_code=200)
+async def update_trip_status(
+    trip_id: str,
+    data: dict = Body(...),
+    db=Depends(get_db),
+    user=Depends(get_current_user),
+):
+    return await _do_update_trip_status(trip_id, data, db, user)
+
+
+@router.patch("/{trip_id}/status", status_code=200)
+async def update_trip_status_patch(
+    trip_id: str,
+    data: dict = Body(...),
+    db=Depends(get_db),
+    user=Depends(get_current_user),
+):
+    return await _do_update_trip_status(trip_id, data, db, user)
 
 
 @router.delete("/{trip_id}", status_code=204)

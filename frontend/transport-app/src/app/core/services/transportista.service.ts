@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
 export interface Transportista {
@@ -23,7 +23,8 @@ export class TransportistaService {
   constructor(private http: HttpClient) {}
 
   getAll(): Observable<Transportista[]> {
-    return this.http.get<Transportista[]>(`${this.apiUrl}/clients`).pipe(
+    return this.http.get<{ items: Transportista[]; total: number }>(`${this.apiUrl}/clients`).pipe(
+      map(r => r.items || []),
       catchError(() => of([]))
     );
   }
