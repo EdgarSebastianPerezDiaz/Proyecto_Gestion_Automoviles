@@ -38,7 +38,7 @@ async def create_vehicle(
     svc = _svc(db)
     try:
         translated = from_frontend("vehicles", body)
-        translated.setdefault("vehicle_type", "Camión")
+        translated.setdefault("vehicle_type", "truck")
         data = VehicleCreate(**translated)
         item = svc.create_vehicle(data.model_dump())
         return to_frontend("vehicles", item)

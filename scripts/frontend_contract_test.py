@@ -198,7 +198,7 @@ company_body = {
     "nit":      random_nit(),
     "direccion": "Calle 100 #50-30, Bogotá",
     "telefono": "3001234567",
-    "correo":   f"company{s}@test.local",
+    "correo":   f"company{s}@example.com",
 }
 r = requests.post(f"{API}/companies", headers=H, json=company_body, timeout=15)
 check("POST /companies 201", r.status_code == 201,
@@ -217,7 +217,7 @@ client_body = {
     "nit":          random_nit(),
     "direccion":    "Av 80 #20-15, Medellín",
     "telefono":     "4441234567",
-    "correo":       f"client{s}@test.local",
+    "correo":       f"client{s}@example.com",
     "tipoDocumento": "NIT",
 }
 r = requests.post(f"{API}/clients", headers=H, json=client_body, timeout=15)
@@ -233,11 +233,11 @@ if r.status_code == 201:
 # ── 13. POST /drivers ─────────────────────────────────────────────
 print("\n[POST /drivers — Angular driver-form-modal payload]")
 driver_body = {
-    "fullName":                  f"Carlos Test{s}",
+    "fullName":                  "Carlos Rodriguez",
     "cedula":                    s,
     "telefono":                  "3201234567",
     "direccion":                 "Cra 7 #30-45, Bogotá",
-    "correo":                    f"driver{s}@test.local",
+    "correo":                    f"driver{s}@example.com",
     "numeroLicencia":            f"LIC{s}",
     "categoriaLicencia":         "C3",
     "fechaVencimientoLicencia":  "2028-12-31T23:59:59",
@@ -309,7 +309,7 @@ recipient_body = {
     "nit":      random_nit(),
     "direccion": "Av El Dorado #68-50, Bogotá",
     "telefono": "3001112233",
-    "correo":   f"recipient{s}@test.local",
+    "correo":   f"recipient{s}@example.com",
 }
 r = requests.post(f"{API}/final-recipients", headers=H, json=recipient_body, timeout=15)
 check("POST /final-recipients 201", r.status_code == 201,
