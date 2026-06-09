@@ -204,12 +204,11 @@ async def lifespan(app: FastAPI):
         db_connection.connect()
         logger.info("[OK] Connected to MongoDB")
     except Exception as e:
-        if flask_env == "production":
-            raise  # Fail hard in production
-        else:
-            # In development, log warning but continue (useful for local testing)
-            logger.warning(f"Could not connect to MongoDB in {flask_env}: {str(e)}")
-            logger.warning("Continuing in offline mode for development testing")
+        # Always log but never crash at startup — health endpoints must remain up.
+        # Auth/resource endpoints will return 500 when DB is unreachable, but the
+        # app stays alive so /health/live can signal readiness to load balancers.
+        logger.error(f"[WARN] MongoDB connection failed ({flask_env}): {str(e)}")
+        logger.error("App starting in degraded mode — auth endpoints may fail")
     
     yield
     
