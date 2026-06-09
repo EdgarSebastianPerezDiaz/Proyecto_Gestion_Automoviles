@@ -46,13 +46,17 @@ class TripCreate(BaseModel):
         """Validate arrival date is after departure date if provided."""
         if v is None:
             return v
-        
+        from datetime import timezone
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
         departure_date = info.data.get('departure_date')
-        if departure_date and v <= departure_date:
-            raise ValueError("Arrival date must be after departure date")
-        
+        if departure_date:
+            if departure_date.tzinfo is None:
+                departure_date = departure_date.replace(tzinfo=timezone.utc)
+            if v <= departure_date:
+                raise ValueError("Arrival date must be after departure date")
         return v
-    
+
     @field_validator('notes')
     @classmethod
     def normalize_notes(cls, v: Optional[str]) -> Optional[str]:
@@ -60,13 +64,14 @@ class TripCreate(BaseModel):
         if v is None:
             return v
         return v.strip()
-    
+
     @field_validator('departure_date')
     @classmethod
     def validate_departure_date(cls, v: datetime) -> datetime:
-        """Validate departure date is not in the past."""
+        """Validate departure date is not in the past (treats naive datetimes as UTC)."""
         from datetime import datetime as dt, timezone
-        # Allow times up to 1 minute in the past (clock skew tolerance)
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
         now = dt.now(timezone.utc)
         if v < now:
             raise ValueError("Departure date cannot be in the past")

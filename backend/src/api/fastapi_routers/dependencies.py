@@ -53,6 +53,90 @@ def serialize_doc(doc: Optional[dict]) -> Optional[dict]:
 
 
 _VEHICLE_STATUS = {"available": "Disponible", "on_trip": "En Viaje", "inactive": "Inactivo"}
+_VEHICLE_ESTADO_TO_STATUS = {"Disponible": "available", "En Viaje": "on_trip", "Inactivo": "inactive"}
+
+
+def from_frontend(collection: str, body: dict) -> dict:
+    """Translate Angular form Spanish field names to English schema field names.
+    Filters out None and empty-string values. Callers must add required defaults for CREATE."""
+    r = {k: v for k, v in body.items() if v is not None and v != ""}
+
+    if collection == "companies":
+        if "nombre" in r:    r["legal_name"] = r.pop("nombre")
+        if "direccion" in r: r["address"]    = r.pop("direccion")
+        if "telefono" in r:  r["phone"]      = r.pop("telefono")
+        if "correo" in r:    r["email"]      = r.pop("correo")
+        r.pop("id", None)
+
+    elif collection == "clients":
+        if "nombre" in r:    r["name"]    = r.pop("nombre")
+        if "direccion" in r: r["address"] = r.pop("direccion")
+        if "telefono" in r:  r["phone"]   = r.pop("telefono")
+        if "correo" in r:    r["email"]   = r.pop("correo")
+        for k in ("nit", "tipoDocumento", "id"):
+            r.pop(k, None)
+
+    elif collection == "drivers":
+        if "fullName" in r:
+            parts = r.pop("fullName").split(None, 1)
+            r["first_name"] = parts[0] if parts else "Sin"
+            r["last_name"]  = parts[1] if len(parts) > 1 else "Apellido"
+        if "cedula" in r:            r["id_number"]        = r.pop("cedula")
+        if "telefono" in r:          r["phone"]             = r.pop("telefono")
+        if "correo" in r:            r["email"]             = r.pop("correo")
+        if "direccion" in r:         r["address"]           = r.pop("direccion")
+        if "numeroLicencia" in r:    r["license_number"]    = r.pop("numeroLicencia")
+        if "categoriaLicencia" in r: r["license_category"]  = r.pop("categoriaLicencia")
+        if "fechaVencimientoLicencia" in r:
+            r["license_expiry"] = r.pop("fechaVencimientoLicencia")
+        for k in ("id", "transportistaId"):
+            r.pop(k, None)
+
+    elif collection == "vehicles":
+        if "placa" in r:           r["plate"]         = r.pop("placa")
+        if "marca" in r:           r["brand"]          = r.pop("marca")
+        if "modelo" in r:
+            try:    r["model_year"] = int(r.pop("modelo"))
+            except (ValueError, TypeError): r.pop("modelo", None)
+        if "capacidad" in r:       r["capacity_tons"]  = float(r.pop("capacidad"))
+        if "transportistaId" in r: r["company_id"]     = r.pop("transportistaId")
+        if "estado" in r:
+            r["status"] = _VEHICLE_ESTADO_TO_STATUS.get(r.pop("estado"), "available")
+        for k in ("conductorId", "id"):
+            r.pop(k, None)
+
+    elif collection == "cargo_types":
+        if "nombre" in r:       r["name"]          = r.pop("nombre")
+        if "descripcion" in r:  r["description"]   = r.pop("descripcion")
+        if "precioPorTon" in r: r["price_per_ton"] = float(r.pop("precioPorTon"))
+        for k in ("pesoReferencia", "id"):
+            r.pop(k, None)
+
+    elif collection == "final_recipients":
+        if "nombre" in r:    r["name"]    = r.pop("nombre")
+        if "direccion" in r: r["address"] = r.pop("direccion")
+        if "telefono" in r:  r["phone"]   = r.pop("telefono")
+        if "correo" in r:    r["email"]   = r.pop("correo")
+        r.pop("id", None)
+        # nit is NOT in FinalRecipientCreate schema — router extracts and stores it separately
+
+    elif collection == "trips":
+        if "vehiculoId" in r:           r["vehicle_id"]     = r.pop("vehiculoId")
+        if "conductorId" in r:          r["driver_id"]      = r.pop("conductorId")
+        if "cargoTypeId" in r:          r["cargo_id"]       = r.pop("cargoTypeId")
+        if "transportistaId" in r:      r["client_id"]      = r.pop("transportistaId")
+        if "destinoId" in r:            r["recipient_id"]   = r.pop("destinoId")
+        if "origenId" in r:             r.pop("origenId")   # origin text sent separately
+        if "peso" in r:                 r["weight_tons"]    = float(r.pop("peso"))
+        if "costoTotal" in r:           r["total_cost"]     = float(r.pop("costoTotal"))
+        if "fechaSalida" in r:          r["departure_date"] = r.pop("fechaSalida")
+        if "fechaLlegadaEstimada" in r: r["arrival_date"]   = r.pop("fechaLlegadaEstimada")
+        for k in ("id", "estado", "fechaLlegadaReal", "documentos", "precioPorTon",
+                  "origenNombre", "destinoNombre", "cargoTypeNombre", "vehiculoPlaca",
+                  "vehiculoCapacidad", "conductorNombre", "transportistaNombre"):
+            r.pop(k, None)
+
+    return r
 
 
 def to_frontend(collection: str, doc: Optional[dict]) -> Optional[dict]:

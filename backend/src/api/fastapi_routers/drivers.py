@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from typing import Optional
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend, from_frontend
 from src.repositories.driver_repository import DriverRepository
 from src.services.driver_service import (
     DriverService, DriverAlreadyExistsError, DriverNotFoundError, DriverValidationError
@@ -31,17 +31,20 @@ async def list_drivers(
 
 @router.post("", status_code=201)
 async def create_driver(
-    data: DriverCreate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = _svc(db)
     try:
+        data = DriverCreate(**from_frontend("drivers", body))
         item = svc.create_driver(data.model_dump())
         return to_frontend("drivers", item)
     except DriverAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except DriverValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
@@ -70,7 +73,8 @@ async def update_driver(
 ):
     svc = _svc(db)
     try:
-        item = svc.update_driver(driver_id, data)
+        translated = from_frontend("drivers", data)
+        item = svc.update_driver(driver_id, translated)
         return to_frontend("drivers", item)
     except DriverNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

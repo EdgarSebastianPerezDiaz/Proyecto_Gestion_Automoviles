@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from typing import Optional
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend, from_frontend
 from src.services.trip_service import TripService, TripError, TripNotFoundError, TripValidationError
 from src.schemas.trip import TripCreate
 
@@ -27,19 +27,23 @@ async def list_trips(
 
 @router.post("", status_code=201)
 async def create_trip(
-    data: TripCreate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = _svc(db)
     user_id = user.get("user_id") or user.get("sub", "system")
     try:
+        translated = from_frontend("trips", body)
+        data = TripCreate(**translated)
         item = svc.create_trip(data.model_dump(), user_id=user_id)
         return to_frontend("trips", item)
     except TripValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TripError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.get("/{trip_id}", status_code=200)

@@ -1,9 +1,9 @@
 """Final recipients CRUD router — uses repository directly (service/schema field mismatch)."""
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from datetime import datetime, timezone
 from bson import ObjectId
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend, from_frontend
 from src.repositories.final_recipient_repository import FinalRecipientRepository
 from src.schemas.final_recipient import FinalRecipientCreate, FinalRecipientUpdate
 
@@ -28,13 +28,22 @@ async def list_recipients(
 
 @router.post("", status_code=201)
 async def create_recipient(
-    data: FinalRecipientCreate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     repo = _repo(db)
+    nit = body.get("nit") or ""  # extract before translation (not in schema)
+    translated = from_frontend("final_recipients", body)
+    translated.setdefault("city", "Colombia")
+    translated.pop("nit", None)  # not in FinalRecipientCreate schema
+    try:
+        data = FinalRecipientCreate(**translated)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
     payload = data.model_dump()
-    # Check email uniqueness when provided
+    if nit:
+        payload["nit"] = nit
     email = payload.get("email")
     if email:
         existing = repo.find_one({"email": email.lower(), "is_active": True})
@@ -67,14 +76,16 @@ async def get_recipient(
 @router.put("/{recipient_id}", status_code=200)
 async def update_recipient(
     recipient_id: str,
-    data: FinalRecipientUpdate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     repo = _repo(db)
     if repo.find_by_id(recipient_id) is None:
         raise HTTPException(status_code=404, detail=f"Recipient {recipient_id} not found")
-    update_fields = {k: v for k, v in data.model_dump(exclude_none=True).items()}
+    update_fields = from_frontend("final_recipients", body)
+    update_fields.pop("nit", None)   # nit is immutable once set
+    update_fields.pop("city", None)  # don't force city override on updates
     update_fields["updated_at"] = datetime.now(timezone.utc)
     repo.update_one({"_id": ObjectId(recipient_id)}, {"$set": update_fields})
     return to_frontend("final_recipients", repo.find_by_id(recipient_id))

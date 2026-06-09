@@ -1,6 +1,6 @@
 """Companies CRUD router."""
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend, from_frontend
 from src.repositories.company_repository import CompanyRepository
 from src.services.company_service import (
     CompanyService, CompanyAlreadyExistsError, CompanyNotFoundError, CompanyValidationError
@@ -30,17 +30,22 @@ async def list_companies(
 
 @router.post("", status_code=201)
 async def create_company(
-    data: CompanyCreate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = _svc(db)
+    translated = from_frontend("companies", body)
+    translated.setdefault("city", "Colombia")
     try:
+        data = CompanyCreate(**translated)
         company = svc.create_company(data.model_dump())
         return to_frontend("companies", company)
     except CompanyAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except CompanyValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
@@ -67,7 +72,9 @@ async def update_company(
 ):
     svc = _svc(db)
     try:
-        company = svc.update_company(company_id, data)
+        translated = from_frontend("companies", data)
+        translated.pop("city", None)  # don't force city override on updates
+        company = svc.update_company(company_id, translated)
         return to_frontend("companies", company)
     except CompanyNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

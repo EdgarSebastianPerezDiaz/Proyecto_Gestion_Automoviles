@@ -1,9 +1,9 @@
 """Cargo types CRUD router."""
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from datetime import datetime, timezone
 from bson import ObjectId
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend, from_frontend
 from src.repositories.cargo_type_repository import CargoTypeRepository
 from src.services.cargo_type_service import (
     CargoTypeService, CargoTypeAlreadyExistsError, CargoTypeNotFoundError, CargoTypeValidationError
@@ -35,14 +35,18 @@ async def list_cargo_types(
 
 @router.post("", status_code=201)
 async def create_cargo_type(
-    data: CargoTypeCreate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = _svc(db)
     try:
+        translated = from_frontend("cargo_types", body)
+        for flag in ("hazardous", "requires_temperature_control",
+                     "requires_special_permit", "fragile"):
+            translated.setdefault(flag, False)
+        data = CargoTypeCreate(**translated)
         result = svc.create_cargo_type(data.model_dump())
-        # Service returns the inserted ID (str), not the full document
         if isinstance(result, str):
             item = svc.get_cargo_type(result)
         else:
@@ -51,6 +55,8 @@ async def create_cargo_type(
     except CargoTypeAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except CargoTypeValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
@@ -71,15 +77,14 @@ async def get_cargo_type(
 @router.put("/{cargo_id}", status_code=200)
 async def update_cargo_type(
     cargo_id: str,
-    data: CargoTypeUpdate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    # Bypass service — CargoTypeRepository lacks update()/soft_delete()
     repo = _repo(db)
     if repo.find_by_id(cargo_id) is None:
         raise HTTPException(status_code=404, detail=f"Cargo type {cargo_id} not found")
-    update_fields = data.model_dump(exclude_none=True)
+    update_fields = from_frontend("cargo_types", body)
     update_fields["updated_at"] = datetime.now(timezone.utc)
     try:
         repo.update_one({"_id": ObjectId(cargo_id)}, {"$set": update_fields})

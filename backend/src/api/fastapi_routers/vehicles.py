@@ -1,8 +1,8 @@
 """Vehicles CRUD router."""
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from typing import Optional
 
-from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend
+from src.api.fastapi_routers.dependencies import get_db, get_current_user, to_frontend, from_frontend
 from src.repositories.vehicle_repository import VehicleRepository
 from src.services.vehicle_service import (
     VehicleService, VehicleAlreadyExistsError, VehicleNotFoundError, VehicleValidationError
@@ -31,17 +31,22 @@ async def list_vehicles(
 
 @router.post("", status_code=201)
 async def create_vehicle(
-    data: VehicleCreate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = _svc(db)
     try:
+        translated = from_frontend("vehicles", body)
+        translated.setdefault("vehicle_type", "Camión")
+        data = VehicleCreate(**translated)
         item = svc.create_vehicle(data.model_dump())
         return to_frontend("vehicles", item)
     except VehicleAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except VehicleValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
@@ -64,13 +69,18 @@ async def get_vehicle(
 @router.put("/{vehicle_id}", status_code=200)
 async def update_vehicle(
     vehicle_id: str,
-    data: VehicleUpdate,
+    body: dict = Body(...),
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = _svc(db)
     try:
-        item = svc.update_vehicle(vehicle_id, data.model_dump(exclude_none=True))
+        translated = from_frontend("vehicles", body)
+        # Only pass fields that VehicleUpdate accepts (plate/company_id are immutable)
+        allowed = {"vehicle_type", "brand", "model_year", "capacity_tons",
+                   "volume_m3", "soat_expiry", "tech_review_expiry", "is_active", "status"}
+        update_fields = {k: v for k, v in translated.items() if k in allowed}
+        item = svc.update_vehicle(vehicle_id, update_fields)
         return to_frontend("vehicles", item)
     except VehicleNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
