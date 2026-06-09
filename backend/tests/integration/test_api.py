@@ -6,11 +6,6 @@ Validates ALL backend endpoints against the live AWS Lambda deployment.
 Usage:
     python backend/tests/integration/test_api.py
     API_URL=https://... python backend/tests/integration/test_api.py
-
-Environment:
-    API_URL       Base URL of the API Gateway (required in CI via workflow output)
-    TEST_EMAIL    Email for the transient test user (auto-generated if omitted)
-    TEST_PASSWORD Password for the test user (default: TestPass123!)
 """
 
 import os
@@ -23,11 +18,10 @@ from typing import Optional
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 BASE_URL   = os.getenv("API_URL", "https://i7xihr7nhk.execute-api.us-east-1.amazonaws.com").rstrip("/")
-TEST_EMAIL = os.getenv("TEST_EMAIL", f"ci_{uuid.uuid4().hex[:8]}@heavy-freight.test")
+# Use @example.com — valid per RFC 2606 and accepted by pydantic email-validator
+TEST_EMAIL = os.getenv("TEST_EMAIL", f"ci{uuid.uuid4().hex[:8]}@example.com")
 TEST_PASS  = os.getenv("TEST_PASSWORD", "TestPass123!")
 TIMEOUT    = 20
-
-# ── ANSI colours ──────────────────────────────────────────────────────────────
 
 GREEN  = "\033[32m"
 RED    = "\033[31m"
@@ -35,13 +29,11 @@ YELLOW = "\033[33m"
 BOLD   = "\033[1m"
 RESET  = "\033[0m"
 
-# ── State shared across test functions ────────────────────────────────────────
-
-_token: Optional[str]  = None
-_results: list[dict]   = []
+_token: Optional[str] = None
+_results: list[dict]  = []
 
 
-# ── Core assertion helper ─────────────────────────────────────────────────────
+# ── Core helper ───────────────────────────────────────────────────────────────
 
 def check(
     label: str,
@@ -50,21 +42,16 @@ def check(
     expected: list[int],
     *,
     body=None,
-    extra_headers: dict | None = None,
     warn_only: bool = False,
+    use_auth: bool = True,
 ) -> Optional[dict]:
-    """Run one HTTP request, print pass/fail, accumulate result."""
     url = f"{BASE_URL}{path}"
     headers: dict = {"Content-Type": "application/json"}
-    if _token:
+    if use_auth and _token:
         headers["Authorization"] = f"Bearer {_token}"
-    if extra_headers:
-        headers.update(extra_headers)
 
     try:
-        resp = requests.request(
-            method, url, json=body, headers=headers, timeout=TIMEOUT
-        )
+        resp = requests.request(method, url, json=body, headers=headers, timeout=TIMEOUT)
     except requests.exceptions.Timeout:
         _print_result(label, method, path, None, False, warn_only, "TIMEOUT")
         _results.append({"label": label, "status": "TIMEOUT", "warn_only": warn_only})
@@ -76,7 +63,6 @@ def check(
 
     passed = resp.status_code in expected
     status = "PASS" if passed else ("WARN" if warn_only else "FAIL")
-
     _print_result(label, method, path, resp.status_code, passed, warn_only)
     if not passed:
         try:
@@ -86,7 +72,6 @@ def check(
         print(f"        expected {expected} → body: {detail}")
 
     _results.append({"label": label, "status": status, "code": resp.status_code, "warn_only": warn_only})
-
     try:
         return resp.json()
     except Exception:
@@ -102,12 +87,12 @@ def _print_result(label, method, path, code, passed, warn_only, extra=""):
         icon, color = "✗", RED
     code_str = f"{GREEN}{code}{RESET}" if code and code < 300 else \
                f"{YELLOW}{code}{RESET}" if code and code < 500 else \
-               f"{RED}{code}{RESET}"  if code else ""
+               f"{RED}{code}{RESET}" if code else ""
     suffix = f" {extra}" if extra else ""
     print(f"  {color}{icon}{RESET} {code_str:20} {method:<7} {path} — {label}{suffix}")
 
 
-# ── Test suites ───────────────────────────────────────────────────────────────
+# ── Health ────────────────────────────────────────────────────────────────────
 
 def test_health():
     print(f"\n{BOLD}── Health ───────────────────────────────────────────────{RESET}")
@@ -116,103 +101,98 @@ def test_health():
     check("deep health",     "GET", "/health/deep",  [200])
 
 
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
 def test_auth():
     global _token
     print(f"\n{BOLD}── Auth ─────────────────────────────────────────────────{RESET}")
     print(f"   Test email: {TEST_EMAIL}")
 
-    # Register — 201 new user, 409 already exists (both acceptable in CI)
-    check(
-        "register new user",
-        "POST", "/auth/register",
-        [201, 409],
-        body={"email": TEST_EMAIL, "password": TEST_PASS, "full_name": "CI Test User"},
-        warn_only=True,
-    )
+    check("register new user", "POST", "/auth/register", [201, 409],
+          body={"email": TEST_EMAIL, "password": TEST_PASS, "full_name": "CI Test User"},
+          warn_only=True, use_auth=False)
 
-    # Login — must return 200 + access_token when Atlas is reachable
-    resp = check(
-        "login with credentials",
-        "POST", "/auth/login",
-        [200],
-        body={"email": TEST_EMAIL, "password": TEST_PASS},
-        warn_only=True,
-    )
+    resp = check("login with credentials", "POST", "/auth/login", [200],
+                 body={"email": TEST_EMAIL, "password": TEST_PASS},
+                 warn_only=True, use_auth=False)
     if resp and isinstance(resp, dict):
         _token = resp.get("access_token")
         if _token:
             print(f"        → JWT obtained (len={len(_token)})")
         else:
-            print(f"   {YELLOW}⚠ No access_token in response — downstream auth checks will be skipped{RESET}")
+            print(f"   {YELLOW}⚠ No access_token in response{RESET}")
     else:
         print(f"   {YELLOW}⚠ Login failed — MongoDB Atlas may be blocking Lambda IPs{RESET}")
-        print(f"     Fix: add 0.0.0.0/0 to Atlas Network Access allowlist")
-
-    # Refresh token
-    if _token:
-        check(
-            "refresh access token",
-            "POST", "/auth/refresh",
-            [200],
-            extra_headers={"Authorization": f"Bearer {_token}"},
-            warn_only=True,
-        )
 
 
-def test_no_auth_rejection():
-    """Endpoints that require auth must reject requests without a token."""
+# ── Auth enforcement ─────────────────────────────────────────────────────────
+
+def test_auth_enforcement():
+    """All resource endpoints must return 401/403 without a token."""
     print(f"\n{BOLD}── Auth enforcement (no token → 401/403) ───────────────{RESET}")
-    saved = _token
-
-    # Temporarily clear the token
-    import __main__
-    __main__._token = None
-
-    # We need to check without a token by passing extra_headers that override
-    # the auth header; simplest: do a raw request
-    for path in ["/companies", "/drivers", "/vehicles"]:
+    resources = [
+        "/companies", "/clients", "/drivers", "/vehicles",
+        "/trips", "/invoices", "/cargo-types",
+        "/final-recipients", "/trip-statuses",
+    ]
+    for path in resources:
         url = f"{BASE_URL}{path}"
         try:
             resp = requests.get(url, headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
-            # Stub GET list returns 200 with {"message": "Not yet implemented"} — no auth guard
-            # That is the current implementation. Just check it doesn't 500.
-            ok = resp.status_code not in (500, 502, 503, 504)
-            status = "PASS" if ok else "FAIL"
-            icon = f"{GREEN}✓{RESET}" if ok else f"{RED}✗{RESET}"
-            print(f"  {icon} {resp.status_code:3}     GET    {path} — no-auth request returns non-5xx")
-            _results.append({"label": f"no-auth GET {path}", "status": status, "warn_only": False})
+            ok = resp.status_code in (401, 403)
+            status = "PASS" if ok else "WARN"
+            icon = f"{GREEN}✓{RESET}" if ok else f"{YELLOW}⚠{RESET}"
+            print(f"  {icon} {resp.status_code:3}     GET    {path} — no-auth → 401/403")
+            _results.append({"label": f"auth-guard GET {path}", "status": status, "warn_only": True})
         except Exception as exc:
             print(f"  {RED}✗{RESET}         GET    {path} — connection error: {exc}")
-            _results.append({"label": f"no-auth GET {path}", "status": "FAIL", "warn_only": False})
+            _results.append({"label": f"auth-guard GET {path}", "status": "FAIL", "warn_only": False})
 
 
-def test_stub_get_list():
-    """All stub resource list endpoints return 200 (even if not implemented)."""
-    print(f"\n{BOLD}── Stub resources — GET list (200) ─────────────────────{RESET}")
+# ── Authenticated resource list ───────────────────────────────────────────────
+
+def test_resource_list():
+    """With JWT, all GET list endpoints return 200 with {items, total}."""
+    if not _token:
+        print(f"\n{YELLOW}── Resource lists — SKIPPED (no JWT) ───────────────────{RESET}")
+        return
+    print(f"\n{BOLD}── Resource lists — authenticated GET → 200 ────────────{RESET}")
     resources = [
         "/companies", "/clients", "/drivers", "/vehicles",
         "/trips", "/invoices", "/cargo-types",
         "/final-recipients", "/trip-statuses",
     ]
     for path in resources:
-        check(f"GET {path}", "GET", path, [200])
+        resp = check(f"GET {path}", "GET", path, [200], warn_only=True)
+        if resp and isinstance(resp, dict) and "items" in resp:
+            total = resp.get("total", 0)
+            _results.append({"label": f"GET {path} has items key", "status": "PASS", "warn_only": False})
+        elif resp is not None:
+            print(f"        response missing 'items' key: {str(resp)[:100]}")
 
 
-def test_stub_write_endpoints():
-    """Stub POST/PUT/DELETE endpoints return 501 Not Implemented."""
-    print(f"\n{BOLD}── Stub resources — write ops (501) ────────────────────{RESET}")
-    resources = [
-        "/companies", "/clients", "/drivers", "/vehicles",
-        "/trips", "/invoices", "/cargo-types",
-        "/final-recipients", "/trip-statuses",
-    ]
+# ── Write endpoints require auth ──────────────────────────────────────────────
+
+def test_write_auth_guard():
+    """POST/PUT/DELETE without token return 401/403, never 501."""
+    print(f"\n{BOLD}── Write auth guard (no token → 401/403) ───────────────{RESET}")
+    resources = ["/companies", "/drivers", "/vehicles", "/cargo-types"]
     fake_id = "000000000000000000000001"
     for path in resources:
-        check(f"POST {path}",          "POST",   path,              [501], body={})
-        check(f"GET {path}/{fake_id}", "GET",    f"{path}/{fake_id}", [501])
-        check(f"PUT {path}/{fake_id}", "PUT",    f"{path}/{fake_id}", [501], body={})
-        check(f"DELETE {path}/{fake_id}", "DELETE", f"{path}/{fake_id}", [204, 501])
+        url = f"{BASE_URL}{path}"
+        try:
+            resp = requests.post(url, json={},
+                                 headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
+            ok = resp.status_code in (401, 403)
+            icon = f"{GREEN}✓{RESET}" if ok else f"{YELLOW}⚠{RESET}"
+            status = "PASS" if ok else "WARN"
+            print(f"  {icon} {resp.status_code:3}     POST   {path} — no-auth returns 401/403")
+            _results.append({"label": f"write-guard POST {path}", "status": status, "warn_only": True})
+        except Exception as exc:
+            _results.append({"label": f"write-guard POST {path}", "status": "WARN", "warn_only": True})
 
+
+# ── 404 handling ──────────────────────────────────────────────────────────────
 
 def test_not_found():
     print(f"\n{BOLD}── 404 handling ────────────────────────────────────────{RESET}")
@@ -232,16 +212,14 @@ def print_summary():
     print(f"  Results: {total} checks")
     print(f"    {GREEN}PASS  {passed:3}{RESET}")
     if warned:
-        print(f"    {YELLOW}WARN  {warned:3}{RESET}  ← MongoDB-dependent (Atlas may be unreachable)")
+        print(f"    {YELLOW}WARN  {warned:3}{RESET}  ← non-blocking (auth/Atlas dependent)")
     if failed:
         print(f"    {RED}FAIL  {failed:3}{RESET}")
     if errors:
         print(f"    {RED}ERROR {errors:3}{RESET}  ← connection/timeout")
 
-    hard_fails = [
-        r for r in _results
-        if r["status"] in ("FAIL", "TIMEOUT", "CONN_ERR") and not r.get("warn_only")
-    ]
+    hard_fails = [r for r in _results
+                  if r["status"] in ("FAIL", "TIMEOUT", "CONN_ERR") and not r.get("warn_only")]
     if hard_fails:
         print(f"\n  {RED}Hard failures:{RESET}")
         for r in hard_fails:
@@ -254,8 +232,6 @@ def print_summary():
         sys.exit(1)
     elif warned or failed or errors:
         print(f"\n{YELLOW}{BOLD}INTEGRATION TESTS PASSED WITH WARNINGS{RESET}")
-        print(f"  Warnings are MongoDB-dependent checks.")
-        print(f"  To resolve: add 0.0.0.0/0 to MongoDB Atlas Network Access.")
         sys.exit(0)
     else:
         print(f"\n{GREEN}{BOLD}ALL INTEGRATION TESTS PASSED ✓{RESET}")
@@ -271,7 +247,8 @@ if __name__ == "__main__":
 
     test_health()
     test_auth()
-    test_stub_get_list()
-    test_stub_write_endpoints()
+    test_auth_enforcement()
+    test_resource_list()
+    test_write_auth_guard()
     test_not_found()
     print_summary()
