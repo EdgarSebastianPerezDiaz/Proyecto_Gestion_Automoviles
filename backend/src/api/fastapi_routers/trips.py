@@ -60,7 +60,9 @@ async def _do_update_trip_status(trip_id: str, data: dict, db, user):
     svc = _svc(db)
     user_id = user.get("user_id") or user.get("sub", "system")
     # Accept status_code, status, or estado (Spanish field used by Angular TripService)
-    status_code = data.get("status_code") or data.get("status") or data.get("estado")
+    # Normalize to lowercase snake_case to match trip_statuses.code (e.g. "En Ruta" -> "en_ruta")
+    raw = data.get("status_code") or data.get("status") or data.get("estado") or ""
+    status_code = raw.lower().replace(" ", "_").replace("-", "_") if raw else None
     if not status_code:
         raise HTTPException(status_code=422, detail="status_code is required")
     try:

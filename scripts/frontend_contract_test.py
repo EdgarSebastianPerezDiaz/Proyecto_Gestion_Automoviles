@@ -78,14 +78,12 @@ if data.get("items"):
     has_fields(item, ["id", "nombre", "nit", "direccion", "telefono", "correo"], "company fields")
 
 # ── 3. CLIENTS (transportista.service.ts calls /clients) ─────
-print("\n[CLIENTS] — TransportistaService expects plain array (not paginated)")
+print("\n[CLIENTS] — TransportistaService.getAll() (fixed: extracts .items from paginated)")
 r = requests.get(f"{API}/clients", headers=H, timeout=15)
 check("GET /clients status 200", r.status_code == 200, f"got {r.status_code}")
 data = r.json()
-is_array = isinstance(data, list)
 is_paginated = isinstance(data, dict) and "items" in data
-check("response is plain array (TransportistaService.getAll)", is_array,
-      "returns paginated dict — service does http.get<Transportista[]> so it gets undefined.items")
+check("response is paginated with items[] (TransportistaService now extracts .items)", is_paginated)
 if is_paginated and data.get("items"):
     item = data["items"][0]
     has_fields(item, ["id", "nombre", "nit", "direccion", "telefono", "correo"], "client fields")
@@ -125,14 +123,12 @@ if data.get("items"):
     has_fields(item, ["id", "nombre", "descripcion", "precioPorTon"], "cargo_type fields")
 
 # ── 7. FINAL RECIPIENTS ───────────────────────────────────────
-print("\n[FINAL RECIPIENTS] — FinalRecipientService.getAll() expects plain array")
+print("\n[FINAL RECIPIENTS] — FinalRecipientService.getAll() (fixed: extracts .items from paginated)")
 r = requests.get(f"{API}/final-recipients", headers=H, timeout=15)
 check("GET /final-recipients status 200", r.status_code == 200, f"got {r.status_code}")
 data = r.json()
-is_array = isinstance(data, list)
 is_paginated = isinstance(data, dict) and "items" in data
-check("response is plain array (FinalRecipientService.getAll)", is_array,
-      "returns paginated dict — service does http.get<FinalRecipient[]>")
+check("response is paginated with items[] (FinalRecipientService now extracts .items)", is_paginated)
 if is_paginated and data.get("items"):
     item = data["items"][0]
     has_fields(item, ["id", "nombre", "nit", "direccion", "telefono", "correo"], "recipient fields")
