@@ -1,0 +1,207 @@
+{
+  "timestamp": "20260608_193719",
+  "passed": 0,
+  "warned": 3,
+  "failed": 30,
+  "score_pct": 0,
+  "results": [
+    {
+      "label": "GET /health/live  →  200 + status OK",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · status=?"
+    },
+    {
+      "label": "GET /health/ready  →  200 + status OK",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · status=?"
+    },
+    {
+      "label": "GET /health/deep  →  200 + status OK",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · status=?"
+    },
+    {
+      "label": "GET /  →  200 + service name",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · ?"
+    },
+    {
+      "label": "POST /auth/register  →  201 o 409",
+      "ok": true,
+      "status": "WARN",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "POST /auth/login  (creds inválidas)  →  401",
+      "ok": true,
+      "status": "WARN",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "POST /auth/login  (creds válidas)  →  200 + JWT",
+      "ok": true,
+      "status": "WARN",
+      "note": "HTTP 500 — Atlas puede estar bloqueando la IP de Lambda"
+    },
+    {
+      "label": "  GET /companies",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  GET /clients",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  GET /drivers",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  GET /vehicles",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  GET /trips",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  GET /invoices",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  GET /cargo-types",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  GET /final-recipients",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  GET /trip-statuses",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · Internal Server Error"
+    },
+    {
+      "label": "  POST /companies",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  POST /clients",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  POST /drivers",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  POST /vehicles",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  POST /trips",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  POST /invoices",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  POST /cargo-types",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  POST /final-recipients",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  POST /trip-statuses",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  GET /companies/000000000000000000000001",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  GET /drivers/000000000000000000000001",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  GET /vehicles/000000000000000000000001",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  GET /trips/000000000000000000000001",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  DELETE /companies/000000000000000000000001",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "  DELETE /trips/000000000000000000000001",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "label": "OPTIONS /auth/login  →  CORS preflight OK",
+      "ok": false,
+      "status": "FAIL",
+      "note": "HTTP 500 · ACAO=http://heavy-freight-frontend-prod.s3-website-us-east-1.amaz"
+    },
+    {
+      "label": "GET /health/live  con Origin  →  CORS header presente",
+      "ok": false,
+      "status": "FAIL",
+      "note": "ACAO=http://heavy-freight-frontend-prod.s3-website-us-east-1.amaz"
+    }
+  ]
+}
