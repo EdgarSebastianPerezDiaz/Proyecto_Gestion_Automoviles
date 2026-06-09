@@ -98,7 +98,7 @@ custom:
     layer: false
     useDownloadCache: false
     useStaticCache: false
-    pythonBin: py -3.11
+    pythonBin: python3
     pipCmdExtraArgs:
       - "--platform"
       - "manylinux2014_x86_64"
